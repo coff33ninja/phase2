@@ -5,6 +5,7 @@ Provides commands for data collection and monitoring
 import asyncio
 import sys
 from datetime import datetime
+from pathlib import Path
 import click
 from loguru import logger
 from rich.console import Console
@@ -14,6 +15,7 @@ from rich.panel import Panel
 
 from config import Config
 from aggregator import Pipeline
+from utils.logger import setup_logger
 
 
 console = Console()
@@ -23,9 +25,9 @@ console = Console()
 @click.option('--log-level', default='INFO', help='Logging level')
 def cli(log_level):
     """System Metrics Collector - Phase 2.1"""
-    # Configure logging
-    logger.remove()
-    logger.add(sys.stderr, level=log_level)
+    # Configure logging with file output
+    log_file = Path(__file__).parent.parent / "logs" / "sentinel.log"
+    setup_logger(log_level=log_level, log_file=log_file)
 
 
 @cli.command()
@@ -44,29 +46,45 @@ async def _monitor(interval: int, duration: int = None):
     try:
         await pipeline.initialize()
         console.print("[green]Starting monitoring...[/green]")
+        logger.info(f"Monitoring started (interval: {interval}s, duration: {duration or 'infinite'})")
         
         start_time = datetime.now()
         count = 0
         
         while True:
-            # Check duration
-            if duration and (datetime.now() - start_time).seconds >= duration:
-                break
-            
-            # Collect and store
-            snapshot_id = await pipeline.collect_and_store()
-            count += 1
-            
-            # Display current metrics
-            snapshot = await pipeline.collect_once()
-            _display_snapshot(snapshot, count)
-            
-            await asyncio.sleep(interval)
+            try:
+                # Check duration
+                if duration and (datetime.now() - start_time).seconds >= duration:
+                    logger.info(f"Duration limit reached ({duration}s), stopping monitoring")
+                    break
+                
+                # Collect and store
+                snapshot_id = await pipeline.collect_and_store()
+                count += 1
+                
+                # Display current metrics
+                snapshot = await pipeline.collect_once()
+                _display_snapshot(snapshot, count)
+                
+                await asyncio.sleep(interval)
+                
+            except Exception as e:
+                logger.error(f"Error in monitoring loop (iteration {count}): {e}", exc_info=True)
+                console.print(f"[red]Error: {e}[/red]")
+                # Continue monitoring despite errors
+                await asyncio.sleep(interval)
     
     except KeyboardInterrupt:
         console.print("\n[yellow]Monitoring stopped by user[/yellow]")
+        logger.info("Monitoring stopped by user (KeyboardInterrupt)")
+    except Exception as e:
+        console.print(f"\n[red]Fatal error: {e}[/red]")
+        logger.critical(f"Fatal error in monitor command: {e}", exc_info=True)
+        raise
     finally:
+        logger.info("Shutting down pipeline...")
         await pipeline.shutdown()
+        logger.info("Monitoring stopped")
 
 
 def _display_snapshot(snapshot, count):

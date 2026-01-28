@@ -166,14 +166,28 @@ class Pipeline:
         self.running = True
         logger.info(f"Starting continuous collection (interval: {interval_seconds}s)")
         
+        consecutive_errors = 0
+        max_consecutive_errors = 10
+        
         while self.running:
             try:
                 await self.collect_and_store()
+                consecutive_errors = 0  # Reset error counter on success
                 await asyncio.sleep(interval_seconds)
             except asyncio.CancelledError:
+                logger.info("Collection cancelled")
                 break
             except Exception as e:
-                logger.error(f"Error in collection loop: {e}")
+                consecutive_errors += 1
+                logger.error(f"Error in collection loop (attempt {consecutive_errors}/{max_consecutive_errors}): {e}", exc_info=True)
+                
+                # If too many consecutive errors, stop the pipeline
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.critical(f"Too many consecutive errors ({consecutive_errors}), stopping collection")
+                    self.running = False
+                    break
+                
+                # Wait before retrying
                 await asyncio.sleep(interval_seconds)
     
     async def start(self):

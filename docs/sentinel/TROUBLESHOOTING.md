@@ -1,378 +1,262 @@
-# Troubleshooting Guide
+# Sentinel Troubleshooting Guide
 
-## Installation Issues
+## Common Issues
 
-### Problem: `uv` command not found
-
-**Symptoms:**
-```
-'uv' is not recognized as an internal or external command
-```
-
-**Solution:**
-1. Install uv from https://docs.astral.sh/uv/
-2. For Windows with Python installed:
-   ```powershell
-   pip install uv
-   ```
-3. Or use the standalone installer from the uv website
-
-### Problem: Python 3.12 not found
+### Sentinel Stops Collecting Data
 
 **Symptoms:**
-```
-Python 3.12 not found
-```
+- Database stops updating
+- No new snapshots in `sentinel/data/system_stats.db`
+- Process not visible in Task Manager
 
-**Solution:**
-```powershell
-# Install Python 3.12 using uv
-uv python install 3.12
-
-# Or download from python.org
-```
-
-### Problem: Virtual environment activation fails
-
-**Symptoms:**
-```
-Execution of scripts is disabled on this system
-```
-
-**Solution (Windows PowerShell):**
-```powershell
-# Run as Administrator
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# Then try again
-.venv\Scripts\Activate.ps1
-```
-
-## Runtime Issues
-
-### Problem: Import errors after installation
-
-**Symptoms:**
-```python
-ModuleNotFoundError: No module named 'psutil'
-```
-
-**Solution:**
-```powershell
-# Ensure venv is activated
-.venv\Scripts\Activate.ps1
-
-# Reinstall dependencies
-uv pip install -r requirements.txt
-```
-
-### Problem: GPU metrics not available
-
-**Symptoms:**
-```
-No GPU detected or GPU tools not available
-```
+**Root Causes:**
+1. Process crashed due to unhandled exception
+2. User closed the console window
+3. System resource constraints
+4. Database corruption
 
 **Solutions:**
 
-**For NVIDIA GPUs:**
-1. Install NVIDIA drivers
-2. Verify nvidia-smi works:
+1. **Check the logs:**
    ```powershell
-   nvidia-smi
+   # View recent logs
+   Get-Content sentinel\logs\sentinel.log -Tail 50
    ```
 
-**For AMD GPUs:**
-1. Install ROCm
-2. Verify rocm-smi works
+2. **Use the service mode with auto-restart:**
+   ```powershell
+   cd sentinel
+   .\start-service.ps1
+   ```
+   This will automatically restart Sentinel if it crashes.
 
-**Fallback:**
-```powershell
-# Install GPUtil as fallback
-uv pip install GPUtil
-```
+3. **Check database status:**
+   ```powershell
+   cd sentinel
+   .\.venv\Scripts\python.exe main.py status
+   ```
 
-### Problem: Permission denied for network connections
+4. **Verify process is running:**
+   ```powershell
+   # Check if sentinel.pid exists
+   Get-Content sentinel\sentinel.pid
+   
+   # Check if process is running
+   Get-Process -Id (Get-Content sentinel\sentinel.pid)
+   ```
+
+### No Log Files Created
 
 **Symptoms:**
-```
-PermissionError: [WinError 5] Access is denied
-```
+- `sentinel/logs/` directory is empty
+- Can't diagnose crashes
 
 **Solution:**
-Run PowerShell as Administrator, or modify `network_collector.py` to skip connection counting:
+The latest version now creates log files automatically. If you're running an older version:
 
-```python
-def _count_connections(self) -> int:
-    try:
-        # ... existing code ...
-    except (psutil.AccessDenied, Exception):
-        return 0  # Return 0 instead of raising
-```
+1. Stop Sentinel
+2. Pull latest changes
+3. Restart Sentinel - logs will now be created at `sentinel/logs/sentinel.log`
 
-### Problem: Database locked error
+### High CPU Usage
 
 **Symptoms:**
-```
-sqlite3.OperationalError: database is locked
-```
-
-**Solution:**
-1. Ensure only one instance is running
-2. Close any database browsers
-3. Delete the database file and restart:
-   ```powershell
-   Remove-Item data\system_stats.db
-   python main.py collect
-   ```
-
-### Problem: High CPU usage
-
-**Symptoms:**
-- System becomes slow
-- CPU usage > 5%
-
-**Solutions:**
-1. Increase collection interval:
-   ```python
-   # In .env
-   COLLECTION_INTERVAL_HIGH=5  # Instead of 1
-   ```
-
-2. Disable unused collectors:
-   ```python
-   # In aggregator/pipeline.py
-   # Comment out collectors you don't need
-   # self.gpu_collector = GPUCollector()
-   ```
-
-3. Reduce process collector count:
-   ```python
-   self.process_collector = ProcessCollector(top_n=5)  # Instead of 10
-   ```
-
-## Data Issues
-
-### Problem: No data in database
-
-**Symptoms:**
-```
-Total snapshots: 0
-```
-
-**Solution:**
-1. Check if collection is running:
-   ```powershell
-   python main.py status
-   ```
-
-2. Try manual collection:
-   ```powershell
-   python main.py collect
-   ```
-
-3. Check logs for errors:
-   ```powershell
-   # Enable debug logging
-   python main.py --log-level DEBUG collect
-   ```
-
-### Problem: Incorrect metric values
-
-**Symptoms:**
-- CPU always 0%
-- RAM values don't make sense
-
-**Solution:**
-1. Run test script:
-   ```powershell
-   python test_basic.py
-   ```
-
-2. Check psutil installation:
-   ```powershell
-   python -c "import psutil; print(psutil.cpu_percent())"
-   ```
-
-3. Reinstall psutil:
-   ```powershell
-   uv pip uninstall psutil
-   uv pip install psutil
-   ```
-
-## CLI Issues
-
-### Problem: CLI commands not working
-
-**Symptoms:**
-```
-Error: No such command 'monitor'
-```
-
-**Solution:**
-1. Ensure you're in the correct directory:
-   ```powershell
-   cd phases\phase2\phase2.1-foundation
-   ```
-
-2. Run with python explicitly:
-   ```powershell
-   python main.py monitor
-   ```
-
-3. Check click installation:
-   ```powershell
-   uv pip install click rich
-   ```
-
-### Problem: Display issues in terminal
-
-**Symptoms:**
-- Garbled output
-- Colors not showing
-
-**Solution:**
-1. Use Windows Terminal instead of CMD
-2. Or disable colors:
-   ```python
-   # In cli/main.py
-   console = Console(force_terminal=False)
-   ```
-
-## Performance Issues
-
-### Problem: Slow data collection
-
-**Symptoms:**
-- Collection takes > 1 second
+- Sentinel uses more than 2% CPU consistently
 - System feels sluggish
 
 **Solutions:**
-1. Profile the collectors:
-   ```python
-   import time
-   start = time.time()
-   await collector.collect()
-   print(f"Time: {time.time() - start}")
+
+1. **Increase collection interval:**
+   Edit `sentinel/.env`:
+   ```
+   COLLECTION_INTERVAL_HIGH=5  # Change from 1 to 5 seconds
    ```
 
-2. Disable slow collectors temporarily
+2. **Check for collector issues:**
+   ```powershell
+   # View logs for errors
+   Get-Content sentinel\logs\sentinel.log | Select-String "ERROR"
+   ```
 
-3. Check disk I/O:
-   - Move database to SSD
-   - Reduce write frequency
+3. **Disable optional collectors:**
+   Edit `sentinel/.env`:
+   ```
+   ENABLE_AIDA64=false
+   ENABLE_HWINFO=false
+   ```
 
-### Problem: Database growing too large
+### Database Locked Errors
 
 **Symptoms:**
-- Database > 1GB
-- Queries slow
+- "Database is locked" errors in logs
+- Failed to save snapshots
 
 **Solutions:**
-1. Run cleanup:
-   ```python
-   from storage import Database
-   from config import Config
-   
-   config = Config.load()
-   db = Database(config.storage.database_path)
-   await db.connect()
-   await db.cleanup_old_data(30)  # Keep only 30 days
-   await db.vacuum()
+
+1. **Check for multiple Sentinel instances:**
+   ```powershell
+   Get-Process python | Where-Object {$_.CommandLine -like "*sentinel*"}
    ```
 
-2. Adjust retention in `.env`:
-   ```
-   DATA_RETENTION_DAYS=30
+2. **Stop all instances and restart:**
+   ```powershell
+   cd sentinel
+   .\stop-service.ps1
+   Start-Sleep -Seconds 2
+   .\start-service.ps1
    ```
 
-## Testing Issues
+3. **If database is corrupted, backup and recreate:**
+   ```powershell
+   cd sentinel\data
+   Copy-Item system_stats.db system_stats.db.backup
+   Remove-Item system_stats.db
+   # Restart Sentinel - it will create a new database
+   ```
 
-### Problem: Tests failing
+### Memory Leaks
 
 **Symptoms:**
-```
-FAILED tests/test_collectors.py::test_cpu_collector
-```
+- Sentinel memory usage grows over time
+- Eventually crashes or slows down
 
-**Solution:**
-1. Install test dependencies:
+**Solutions:**
+
+1. **Check current memory usage:**
    ```powershell
-   uv pip install pytest pytest-asyncio
+   Get-Process python | Where-Object {$_.CommandLine -like "*sentinel*"} | Select-Object WorkingSet64
    ```
 
-2. Run tests with verbose output:
+2. **Restart Sentinel daily:**
+   Use Windows Task Scheduler to restart Sentinel once per day:
    ```powershell
-   pytest -v
+   # Stop
+   cd sentinel
+   .\stop-service.ps1
+   
+   # Wait
+   Start-Sleep -Seconds 5
+   
+   # Start
+   .\start-service.ps1
    ```
 
-3. Run specific test:
-   ```powershell
-   pytest tests/test_collectors.py::test_cpu_collector -v
-   ```
+3. **Report the issue:**
+   Include logs and memory usage patterns in your bug report.
 
-## Common Error Messages
+## Service Management
 
-### `AttributeError: module 'psutil' has no attribute 'sensors_temperatures'`
+### Starting Sentinel as a Service
 
-**Cause:** Windows doesn't support temperature sensors through psutil
-
-**Solution:** This is expected on Windows. Temperature will be None.
-
-### `ImportError: cannot import name 'BaseCollector'`
-
-**Cause:** Python path issue
-
-**Solution:**
+**Recommended method** (with auto-restart):
 ```powershell
-# Run from project root
-cd phases\phase2\phase2.1-foundation
-python main.py collect
+cd sentinel
+.\start-service.ps1
 ```
 
-### `pydantic.ValidationError`
+**Options:**
+```powershell
+# Custom interval
+.\start-service.ps1 -Interval 1
 
-**Cause:** Invalid data in models
+# Disable auto-restart
+.\start-service.ps1 -NoRestart
+```
 
-**Solution:** Check the error message for which field is invalid and fix the data source.
+### Stopping the Service
+
+```powershell
+cd sentinel
+.\stop-service.ps1
+```
+
+### Checking Service Status
+
+```powershell
+# Check if running
+Get-Content sentinel\sentinel.pid
+Get-Process -Id (Get-Content sentinel\sentinel.pid)
+
+# View recent activity
+Get-Content sentinel\logs\sentinel.log -Tail 20
+
+# Database statistics
+cd sentinel
+.\.venv\Scripts\python.exe main.py status
+```
+
+## Log Analysis
+
+### View Recent Errors
+
+```powershell
+Get-Content sentinel\logs\sentinel.log | Select-String "ERROR" -Context 2
+```
+
+### View Critical Issues
+
+```powershell
+Get-Content sentinel\logs\sentinel.log | Select-String "CRITICAL" -Context 5
+```
+
+### Monitor Logs in Real-Time
+
+```powershell
+Get-Content sentinel\logs\sentinel.log -Wait -Tail 20
+```
+
+### Check for Crashes
+
+```powershell
+Get-Content sentinel\logs\service.log
+```
+
+## Performance Tuning
+
+### Reduce Resource Usage
+
+1. **Increase collection interval:**
+   ```
+   COLLECTION_INTERVAL_HIGH=5  # Default: 1
+   ```
+
+2. **Reduce process monitoring:**
+   Edit `sentinel/collectors/process_collector.py` to reduce `top_n` parameter
+
+3. **Disable GPU monitoring if not needed:**
+   Comment out GPU collector in `sentinel/aggregator/pipeline.py`
+
+### Optimize Database
+
+```powershell
+cd sentinel
+.\.venv\Scripts\python.exe -c "import sqlite3; conn = sqlite3.connect('data/system_stats.db'); conn.execute('VACUUM'); conn.close()"
+```
 
 ## Getting Help
 
-If you're still stuck:
+If you're still experiencing issues:
 
-1. Check the logs:
+1. **Collect diagnostic information:**
    ```powershell
-   # Look in logs/ directory if logging to file
-   # Or run with debug level
-   python main.py --log-level DEBUG collect
+   # System info
+   systeminfo
+   
+   # Python version
+   cd sentinel
+   .\.venv\Scripts\python.exe --version
+   
+   # Package versions
+   .\.venv\Scripts\pip.exe list
+   
+   # Recent logs
+   Get-Content logs\sentinel.log -Tail 100
    ```
 
-2. Run the basic test:
-   ```powershell
-   python test_basic.py
-   ```
+2. **Check documentation:**
+   - `docs/sentinel/README.md` - Overview
+   - `docs/sentinel/USAGE.md` - Usage guide
+   - `docs/README.md` - General documentation
 
-3. Check system requirements:
-   - Python 3.12+
-   - Windows 10/11
-   - 500MB free RAM
-   - 1GB free disk space
-
-4. Review the implementation checklist:
-   - See IMPLEMENTATION_CHECKLIST.md for known limitations
-
-## Known Limitations
-
-1. **Temperature sensors:** Not available on all systems
-2. **GPU metrics:** Requires vendor-specific tools
-3. **Network connections:** May require admin privileges
-4. **Process details:** Some processes may be inaccessible
-5. **AMD GPU support:** Limited compared to NVIDIA
-
-## Tips for Smooth Operation
-
-1. **Start simple:** Begin with `collect` command before `monitor`
-2. **Check status regularly:** Use `status` command to verify operation
-3. **Monitor resources:** Keep an eye on CPU/RAM usage
-4. **Regular cleanup:** Run cleanup monthly
-5. **Backup data:** Export important data regularly
+3. **Report the issue:**
+   Include all diagnostic information and steps to reproduce.

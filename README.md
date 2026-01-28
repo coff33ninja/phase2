@@ -2,7 +2,16 @@
 
 A hybrid AI system combining local ML (TensorFlow) with cloud AI (Google Gemini 2.5 Flash) for intelligent system monitoring, pattern learning, and proactive optimization.
 
-## � Features
+## 🔥 Recent Improvements
+
+**Sentinel Reliability Update** (January 2025)
+- ✅ **File logging** - All activity now logged to `sentinel/logs/sentinel.log`
+- ✅ **Auto-restart** - Service mode automatically recovers from crashes
+- ✅ **Enhanced error handling** - Better error recovery and diagnostics
+- ✅ **Service management** - Easy start/stop scripts for background operation
+- 📖 See [Sentinel Crash Fix Documentation](docs/SENTINEL_CRASH_FIX.md) for details
+
+## 🎯 Features
 
 - **Sentinel** - Real-time system metrics collection (CPU, RAM, GPU, Disk, Network)
 - **Oracle** - Local ML pattern learning with TensorFlow (LSTM, Anomaly Detection, Clustering)

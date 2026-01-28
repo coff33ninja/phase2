@@ -33,6 +33,34 @@ notepad .env
 
 ## CLI Commands
 
+### Service Management (Recommended)
+
+Run Sentinel as a background service with auto-restart:
+
+```powershell
+# Start service (auto-restarts on crash)
+.\start-service.ps1
+
+# Start with custom interval
+.\start-service.ps1 -Interval 5
+
+# Start without auto-restart
+.\start-service.ps1 -NoRestart
+
+# Stop service
+.\stop-service.ps1
+
+# Check if running
+Get-Content sentinel.pid
+Get-Process -Id (Get-Content sentinel.pid)
+```
+
+**Benefits:**
+- Runs in background (hidden window)
+- Automatically restarts on crash
+- Logs to `logs/sentinel.log` and `logs/service.log`
+- Survives console window closure
+
 ### Collect Data Once
 
 Collect system metrics once and display:
@@ -41,9 +69,9 @@ Collect system metrics once and display:
 python main.py collect
 ```
 
-### Continuous Monitoring
+### Continuous Monitoring (Interactive)
 
-Monitor system metrics in real-time:
+Monitor system metrics in real-time (visible window):
 
 ```powershell
 # Monitor with default 1-second interval
@@ -55,6 +83,8 @@ python main.py monitor --interval 5
 # Monitor for specific duration (60 seconds)
 python main.py monitor --duration 60
 ```
+
+**Note:** Interactive monitoring stops if you close the window. Use service mode for persistent collection.
 
 ### View Status
 
@@ -366,7 +396,43 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
+## Logging
+
+Sentinel now logs to files automatically:
+
+- **Application logs**: `logs/sentinel.log` - All collection activity, errors, and warnings
+- **Service logs**: `logs/service.log` - Auto-restart events and service management
+
+View logs:
+```powershell
+# Recent activity
+Get-Content logs\sentinel.log -Tail 50
+
+# Monitor in real-time
+Get-Content logs\sentinel.log -Wait -Tail 20
+
+# Search for errors
+Get-Content logs\sentinel.log | Select-String "ERROR"
+
+# View service restarts
+Get-Content logs\service.log
+```
+
 ## Troubleshooting
+
+For detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+### Issue: Sentinel Stops Collecting Data
+
+**Solution**: Use service mode with auto-restart:
+```powershell
+.\start-service.ps1
+```
+
+Check logs for crash details:
+```powershell
+Get-Content logs\sentinel.log -Tail 100
+```
 
 ### Issue: Import Errors
 
@@ -390,7 +456,12 @@ uv pip install -r requirements.txt
 
 ### Issue: Database Locked
 
-**Solution**: Ensure only one instance is writing to the database at a time.
+**Solution**: Ensure only one instance is writing to the database at a time:
+```powershell
+.\stop-service.ps1
+Start-Sleep -Seconds 2
+.\start-service.ps1
+```
 
 ## Performance Tips
 
