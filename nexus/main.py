@@ -44,7 +44,7 @@ async def root():
     html_file = Path(__file__).parent / "templates" / "index.html"
     
     if html_file.exists():
-        return html_file.read_text()
+        return html_file.read_text(encoding='utf-8')
     
     # Fallback HTML
     return """
