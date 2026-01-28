@@ -8,6 +8,7 @@ from loguru import logger
 
 from config import config
 from api import metrics_router, patterns_router, chat_router, control_router
+from api.status import router as status_router
 from websockets.metrics_stream import metrics_handler
 
 # Create FastAPI app
@@ -31,6 +32,7 @@ app.include_router(metrics_router)
 app.include_router(patterns_router)
 app.include_router(chat_router)
 app.include_router(control_router)
+app.include_router(status_router)
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"

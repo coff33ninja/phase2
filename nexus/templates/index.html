@@ -230,20 +230,39 @@
                 <h2>📊 System Status</h2>
                 <div style="margin-bottom: 20px;">
                     <div style="margin-bottom: 10px;">
-                        <span class="status-indicator online"></span>
-                        <strong>Sentinel</strong> - Collecting Data
+                        <span class="status-indicator" id="sentinel-status"></span>
+                        <strong>Sentinel</strong> - <span id="sentinel-text">Checking...</span>
                     </div>
                     <div style="margin-bottom: 10px;">
-                        <span class="status-indicator online"></span>
-                        <strong>Oracle</strong> - Learning Patterns
+                        <span class="status-indicator" id="oracle-status"></span>
+                        <strong>Oracle</strong> - <span id="oracle-text">Checking...</span>
                     </div>
                     <div style="margin-bottom: 10px;">
                         <span class="status-indicator online"></span>
                         <strong>Sage</strong> - AI Ready
                     </div>
                     <div>
-                        <span class="status-indicator offline"></span>
-                        <strong>Guardian</strong> - Standby
+                        <span class="status-indicator" id="guardian-status"></span>
+                        <strong>Guardian</strong> - <span id="guardian-text">Standby</span>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Training Status</h3>
+                <div id="training-status" style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Data Collection</span>
+                            <span id="training-progress-text">0%</span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 10px; height: 20px; overflow: hidden;">
+                            <div id="training-progress-bar" style="background: linear-gradient(90deg, #4ade80, #22c55e); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;">
+                            <span id="training-details">Collecting data...</span>
+                        </div>
+                    </div>
+                    <div id="training-message" style="padding: 10px; background: rgba(255,215,0,0.2); border-radius: 8px; font-size: 0.9em;">
+                        Loading training status...
                     </div>
                 </div>
                 
@@ -252,6 +271,7 @@
                     <a href="/api/metrics/current" class="api-link" target="_blank">📈 Metrics</a>
                     <a href="/api/patterns/learned" class="api-link" target="_blank">🧠 Patterns</a>
                     <a href="/api/chat/history" class="api-link" target="_blank">💬 History</a>
+                    <a href="/api/status/training" class="api-link" target="_blank">🎯 Training</a>
                     <a href="/docs" class="api-link" target="_blank">📚 API Docs</a>
                 </div>
             </div>
@@ -351,9 +371,104 @@
             }
         }
         
+        async function updateSystemStatus() {
+            try {
+                const response = await fetch('/api/status/system');
+                const data = await response.json();
+                
+                // Update component status indicators
+                const sentinelStatus = document.getElementById('sentinel-status');
+                const sentinelText = document.getElementById('sentinel-text');
+                const oracleStatus = document.getElementById('oracle-status');
+                const oracleText = document.getElementById('oracle-text');
+                const guardianStatus = document.getElementById('guardian-status');
+                const guardianText = document.getElementById('guardian-text');
+                
+                if (data.components.sentinel.active) {
+                    sentinelStatus.className = 'status-indicator online';
+                    sentinelText.textContent = 'Collecting Data';
+                } else {
+                    sentinelStatus.className = 'status-indicator offline';
+                    sentinelText.textContent = 'Offline';
+                }
+                
+                if (data.components.oracle.trained) {
+                    oracleStatus.className = 'status-indicator online';
+                    oracleText.textContent = 'Trained & Ready';
+                } else {
+                    oracleStatus.className = 'status-indicator offline';
+                    oracleText.textContent = 'Not Trained';
+                }
+                
+                if (data.components.guardian.active) {
+                    guardianStatus.className = 'status-indicator online';
+                    guardianText.textContent = data.components.guardian.mode;
+                } else {
+                    guardianStatus.className = 'status-indicator offline';
+                    guardianText.textContent = 'Offline';
+                }
+                
+            } catch (error) {
+                console.error('Failed to update system status:', error);
+            }
+        }
+        
+        async function updateTrainingStatus() {
+            try {
+                const response = await fetch('/api/status/training');
+                const data = await response.json();
+                
+                const progressBar = document.getElementById('training-progress-bar');
+                const progressText = document.getElementById('training-progress-text');
+                const detailsText = document.getElementById('training-details');
+                const messageDiv = document.getElementById('training-message');
+                
+                // Update progress bar
+                const progress = data.progress.overall_percentage;
+                progressBar.style.width = progress + '%';
+                progressText.textContent = progress + '%';
+                
+                // Update details
+                const hours = data.data_collection_hours.toFixed(1);
+                const samples = data.snapshot_count;
+                detailsText.textContent = `${hours}h / ${data.requirements.min_hours}h | ${samples} / ${data.requirements.min_samples} samples`;
+                
+                // Update message based on status
+                if (data.oracle_trained) {
+                    messageDiv.style.background = 'rgba(74, 222, 128, 0.3)';
+                    messageDiv.innerHTML = '✓ Oracle is trained and ready! All systems operational.';
+                } else if (data.ready_for_training) {
+                    messageDiv.style.background = 'rgba(34, 197, 94, 0.3)';
+                    messageDiv.innerHTML = '✓ Ready to train! Run: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">cd oracle && python main.py train</code>';
+                } else if (!data.sentinel_active) {
+                    messageDiv.style.background = 'rgba(239, 68, 68, 0.3)';
+                    messageDiv.innerHTML = '⚠ Sentinel is not running. Start it to begin collecting data.';
+                } else {
+                    messageDiv.style.background = 'rgba(255, 215, 0, 0.2)';
+                    let message = '⏳ Collecting training data... ';
+                    if (data.next_steps.length > 0) {
+                        const step = data.next_steps[0];
+                        message += step.description;
+                    }
+                    messageDiv.innerHTML = message;
+                }
+                
+            } catch (error) {
+                console.error('Failed to update training status:', error);
+            }
+        }
+        
         // Update metrics every 5 seconds
         updateMetrics();
         setInterval(updateMetrics, 5000);
+        
+        // Update system status every 10 seconds
+        updateSystemStatus();
+        setInterval(updateSystemStatus, 10000);
+        
+        // Update training status every 10 seconds
+        updateTrainingStatus();
+        setInterval(updateTrainingStatus, 10000);
         
         // Welcome message
         addMessage('Hello! I\'m Sage, your AI system assistant powered by Gemini 2.5 Flash. Ask me anything about your system!', 'sage');

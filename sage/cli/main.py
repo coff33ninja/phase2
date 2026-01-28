@@ -91,25 +91,152 @@ async def _handle_query(query: str, session_id: str = None):
 @cli.command()
 def status():
     """Show Sage status and configuration."""
-    console.print("\n[bold cyan]Sage Status[/bold cyan]\n")
+    asyncio.run(_show_status())
+
+
+async def _show_status():
+    """Show comprehensive system status."""
+    import sqlite3
+    from datetime import datetime, timedelta
+    from rich.table import Table
+    from rich.panel import Panel
     
-    console.print(f"Model: [green]{config.gemini_model}[/green]")
-    console.print(f"API Key: [green]{'Set' if config.gemini_api_key else 'Not Set'}[/green]")
-    console.print(f"Temperature: {config.temperature}")
-    console.print(f"Max Output Tokens: {config.max_output_tokens}")
+    console.print("\n[bold cyan]" + "="*63 + "[/bold cyan]")
+    console.print("[bold cyan]" + " "*18 + "Phase 2 System Status" + " "*24 + "[/bold cyan]")
+    console.print("[bold cyan]" + "="*63 + "[/bold cyan]\n")
     
-    console.print(f"\n[bold]Databases:[/bold]")
-    console.print(f"Conversations: {config.conversation_db_path}")
-    console.print(f"Sentinel: {config.sentinel_db_path}")
-    console.print(f"Oracle: {config.oracle_patterns_db_path}")
+    # Sage Configuration
+    console.print("[bold yellow]AI Sage Configuration[/bold yellow]")
+    console.print(f"  Model: [green]{config.gemini_model}[/green]")
+    console.print(f"  API Key: [{'green' if config.gemini_api_key else 'red'}]"
+                 f"{'OK Configured' if config.gemini_api_key else 'X Not Set'}[/]")
+    console.print(f"  Temperature: {config.temperature}")
+    console.print(f"  Max Tokens: {config.max_output_tokens}\n")
     
-    console.print(f"\n[bold]Integration:[/bold]")
-    console.print(f"Sentinel: [{'green' if config.sentinel_db_path.exists() else 'red'}]"
-                 f"{'Connected' if config.sentinel_db_path.exists() else 'Not Found'}[/]")
-    console.print(f"Oracle: [{'green' if config.oracle_patterns_db_path.exists() else 'red'}]"
-                 f"{'Connected' if config.oracle_patterns_db_path.exists() else 'Not Found'}[/]")
+    # Sentinel Status
+    console.print("[bold yellow]Data Sentinel (Data Collection)[/bold yellow]")
+    if config.sentinel_db_path.exists():
+        try:
+            conn = sqlite3.connect(config.sentinel_db_path)
+            cursor = conn.cursor()
+            
+            # Get snapshot count
+            cursor.execute("SELECT COUNT(*) FROM system_snapshots")
+            snapshot_count = cursor.fetchone()[0]
+            
+            # Get time range
+            cursor.execute("SELECT MIN(timestamp), MAX(timestamp) FROM system_snapshots")
+            min_time, max_time = cursor.fetchone()
+            
+            # Calculate collection duration
+            if min_time and max_time:
+                start = datetime.fromisoformat(min_time)
+                end = datetime.fromisoformat(max_time)
+                duration = end - start
+                hours = duration.total_seconds() / 3600
+                
+                console.print(f"  Status: [green]OK Active[/green]")
+                console.print(f"  Snapshots: [cyan]{snapshot_count:,}[/cyan]")
+                console.print(f"  Duration: [cyan]{hours:.1f} hours[/cyan]")
+                console.print(f"  Started: [dim]{start.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+                console.print(f"  Latest: [dim]{end.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+            else:
+                console.print(f"  Status: [yellow]!! No data yet[/yellow]")
+            
+            conn.close()
+        except Exception as e:
+            console.print(f"  Status: [red]X Error: {e}[/red]")
+    else:
+        console.print(f"  Status: [red]X Database not found[/red]")
+        console.print(f"  Path: [dim]{config.sentinel_db_path}[/dim]")
     
     console.print()
+    
+    # Oracle Training Readiness
+    console.print("[bold yellow]Oracle (ML Training)[/bold yellow]")
+    if config.oracle_patterns_db_path.exists():
+        console.print(f"  Status: [green]OK Trained[/green]")
+        console.print(f"  Database: [green]Found[/green]")
+    else:
+        console.print(f"  Status: [yellow].. Awaiting Training[/yellow]")
+        
+        # Calculate training readiness
+        if config.sentinel_db_path.exists():
+            try:
+                conn = sqlite3.connect(config.sentinel_db_path)
+                cursor = conn.cursor()
+                
+                cursor.execute("SELECT COUNT(*) FROM system_snapshots")
+                snapshot_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT MIN(timestamp), MAX(timestamp) FROM system_snapshots")
+                min_time, max_time = cursor.fetchone()
+                
+                if min_time and max_time:
+                    start = datetime.fromisoformat(min_time)
+                    end = datetime.fromisoformat(max_time)
+                    duration_hours = (end - start).total_seconds() / 3600
+                    
+                    # Training requirements
+                    MIN_HOURS = 1.0  # Minimum 1 hour of data
+                    MIN_SAMPLES = 100  # Minimum 100 snapshots
+                    RECOMMENDED_HOURS = 24.0  # Recommended 24 hours
+                    
+                    hours_progress = min(100, (duration_hours / MIN_HOURS) * 100)
+                    samples_progress = min(100, (snapshot_count / MIN_SAMPLES) * 100)
+                    
+                    console.print(f"\n  [bold]Training Readiness:[/bold]")
+                    
+                    # Time progress bar
+                    time_bar = "█" * int(hours_progress / 5) + "░" * (20 - int(hours_progress / 5))
+                    time_bar = "#" * int(hours_progress / 5) + "-" * (20 - int(hours_progress / 5))
+                    time_status = "✓" if duration_hours >= MIN_HOURS else "⏳"
+                    time_status = "OK" if duration_hours >= MIN_HOURS else ".."
+                    console.print(f"  {time_status} Time: [{time_bar}] {duration_hours:.1f}h / {MIN_HOURS}h minimum")
+                    
+                    # Samples progress bar
+                    samples_bar = "█" * int(samples_progress / 5) + "░" * (20 - int(samples_progress / 5))
+                    samples_bar = "#" * int(samples_progress / 5) + "-" * (20 - int(samples_progress / 5))
+                    samples_status = "✓" if snapshot_count >= MIN_SAMPLES else "⏳"
+                    samples_status = "OK" if snapshot_count >= MIN_SAMPLES else ".."
+                    console.print(f"  {samples_status} Data: [{samples_bar}] {snapshot_count} / {MIN_SAMPLES} samples")
+                    
+                    # Overall readiness
+                    if duration_hours >= MIN_HOURS and snapshot_count >= MIN_SAMPLES:
+                        console.print(f"\n  [bold green]OK Ready for training![/bold green]")
+                        console.print(r"  [dim]Run: cd oracle && .\.venv\Scripts\python.exe main.py train[/dim]")
+                    else:
+                        time_remaining = max(0, MIN_HOURS - duration_hours)
+                        samples_remaining = max(0, MIN_SAMPLES - snapshot_count)
+                        console.print(f"\n  [yellow].. Keep collecting data...[/yellow]")
+                        if time_remaining > 0:
+                            console.print(f"  [dim]Need {time_remaining:.1f} more hours[/dim]")
+                        if samples_remaining > 0:
+                            console.print(f"  [dim]Need {samples_remaining} more samples[/dim]")
+                    
+                    # Recommendation
+                    if duration_hours < RECOMMENDED_HOURS:
+                        console.print(f"\n  [dim]Tip: {RECOMMENDED_HOURS}h of data recommended for best results[/dim]")
+                
+                conn.close()
+            except Exception as e:
+                console.print(f"  Error checking readiness: {e}")
+        else:
+            console.print(f"  [yellow]!! Sentinel must be running first[/yellow]")
+    
+    console.print()
+    
+    # Guardian Status
+    console.print("[bold yellow]Guardian (Auto-Tuning)[/bold yellow]")
+    console.print(f"  Status: [cyan]Ready (on-demand)[/cyan]")
+    console.print(f"  Profiles: Gaming, Work, Power Saver\n")
+    
+    # Nexus Status
+    console.print("[bold yellow]Nexus (Dashboard)[/bold yellow]")
+    console.print(f"  URL: [cyan]http://localhost:8001[/cyan]")
+    console.print(f"  API Docs: [cyan]http://localhost:8001/docs[/cyan]\n")
+    
+    console.print("[bold cyan]" + "="*63 + "[/bold cyan]\n")
 
 
 @cli.command()

@@ -22,16 +22,66 @@ class ContextAggregator:
         """Get complete system context.
         
         Returns:
-            Dictionary containing system state, patterns, anomalies, predictions
+            Dictionary containing system state, patterns, anomalies, predictions, and training status
         """
         context = {
             "system_state": self._get_current_state(),
             "patterns": self._get_learned_patterns(),
             "anomalies": self._get_recent_anomalies(),
-            "predictions": self._get_predictions()
+            "predictions": self._get_predictions(),
+            "training_status": self._get_training_status()
         }
         
         return context
+    
+    def _get_training_status(self) -> Dict:
+        """Get Oracle training readiness status.
+        
+        Returns:
+            Training status information
+        """
+        status = {
+            "oracle_trained": self.oracle_db.exists(),
+            "sentinel_active": self.sentinel_db.exists(),
+            "ready_for_training": False,
+            "data_collection_hours": 0,
+            "snapshot_count": 0,
+            "min_hours_needed": 1.0,
+            "min_samples_needed": 100,
+            "recommended_hours": 24.0
+        }
+        
+        if not self.sentinel_db.exists():
+            return status
+        
+        try:
+            conn = sqlite3.connect(self.sentinel_db)
+            cursor = conn.cursor()
+            
+            # Get snapshot count
+            cursor.execute("SELECT COUNT(*) FROM system_snapshots")
+            status["snapshot_count"] = cursor.fetchone()[0]
+            
+            # Get time range
+            cursor.execute("SELECT MIN(timestamp), MAX(timestamp) FROM system_snapshots")
+            min_time, max_time = cursor.fetchone()
+            
+            if min_time and max_time:
+                start = datetime.fromisoformat(min_time)
+                end = datetime.fromisoformat(max_time)
+                duration_hours = (end - start).total_seconds() / 3600
+                status["data_collection_hours"] = round(duration_hours, 1)
+                
+                # Check if ready for training
+                if (duration_hours >= status["min_hours_needed"] and 
+                    status["snapshot_count"] >= status["min_samples_needed"]):
+                    status["ready_for_training"] = True
+            
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error getting training status: {e}")
+        
+        return status
     
     def _get_current_state(self) -> Optional[Dict]:
         """Get current system state from Sentinel.
@@ -47,13 +97,23 @@ class ContextAggregator:
             conn = sqlite3.connect(self.sentinel_db)
             cursor = conn.cursor()
             
-            # Get most recent metrics
+            # Get most recent metrics from Sentinel's normalized schema
             cursor.execute("""
-                SELECT cpu_percent, ram_used_gb, gpu_usage, 
-                       disk_read_mb, disk_write_mb,
-                       network_sent_mb, network_recv_mb
-                FROM system_metrics
-                ORDER BY timestamp DESC
+                SELECT 
+                    c.usage_percent as cpu_percent,
+                    r.used_gb as ram_used_gb,
+                    g.usage_percent as gpu_usage,
+                    d.read_mbps as disk_read_mb,
+                    d.write_mbps as disk_write_mb,
+                    n.download_mbps as network_recv_mb,
+                    n.upload_mbps as network_sent_mb
+                FROM system_snapshots s
+                LEFT JOIN cpu_metrics c ON c.snapshot_id = s.id
+                LEFT JOIN ram_metrics r ON r.snapshot_id = s.id
+                LEFT JOIN gpu_metrics g ON g.snapshot_id = s.id
+                LEFT JOIN disk_metrics d ON d.snapshot_id = s.id
+                LEFT JOIN network_metrics n ON n.snapshot_id = s.id
+                ORDER BY s.timestamp DESC
                 LIMIT 1
             """)
             
@@ -62,16 +122,16 @@ class ContextAggregator:
             
             if row:
                 return {
-                    "cpu": round(row[0], 1),
-                    "ram": round(row[1], 1),
+                    "cpu": round(row[0], 1) if row[0] else 0,
+                    "ram": round(row[1], 1) if row[1] else 0,
                     "gpu": round(row[2], 1) if row[2] else 0,
                     "disk": {
-                        "read_mb": round(row[3], 1),
-                        "write_mb": round(row[4], 1)
+                        "read_mb": round(row[3], 1) if row[3] else 0,
+                        "write_mb": round(row[4], 1) if row[4] else 0
                     },
                     "network": {
-                        "sent_mb": round(row[5], 1),
-                        "recv_mb": round(row[6], 1)
+                        "recv_mb": round(row[5], 1) if row[5] else 0,
+                        "sent_mb": round(row[6], 1) if row[6] else 0
                     }
                 }
             
