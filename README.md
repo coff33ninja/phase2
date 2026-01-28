@@ -51,42 +51,170 @@ http://localhost:8001
 ## 📊 Components
 
 ### Sentinel - Data Collection
-Collects system metrics every 30 seconds:
-- CPU usage and temperature
-- RAM usage and caching
-- GPU usage and memory
-- Disk I/O and queue length
-- Network traffic and connections
-- Process information
+**Purpose:** Real-time system monitoring and data storage
+
+**What It Does:**
+- Collects metrics every 30 seconds from 11 specialized collectors
+- Stores data in SQLite time-series database
+- Detects patterns, spikes, and anomalies
+- Provides CLI for data access and export
+
+**Collectors:**
+- **CPU:** Usage, frequency, per-core metrics, temperature (needs AIDA64)
+- **RAM:** Total, used, available, cached memory
+- **GPU:** Usage, VRAM, temperature ✅, fan speed, power draw
+- **Disk:** Read/write speeds, queue length, per-disk usage
+- **Network:** Download/upload speeds, active connections
+- **Process:** Top processes by CPU/RAM, thread counts
+- **Context:** User activity, time of day, detected actions (gaming/coding/browsing)
+- **Temperature:** System sensors (needs AIDA64/HWiNFO64 - see TEMPERATURE_SETUP.md)
+- **PowerShell:** Custom script integration (optional)
+- **WMI:** Windows Management Instrumentation (optional)
+- **AIDA64:** Comprehensive hardware sensors (implemented, not integrated)
+
+**Database Schema:**
+- `system_snapshots` - Main table with timestamps
+- `cpu_metrics`, `ram_metrics`, `gpu_metrics`, etc. - Separate metric tables
+- Foreign key relationships for efficient queries
+
+**See:** `COLLECTOR_REFERENCE.md` for detailed collector documentation
+
+---
 
 ### Oracle - ML Pattern Learning
-Local machine learning with TensorFlow:
-- LSTM forecasting for resource prediction
-- Isolation Forest for anomaly detection
-- K-Means clustering for usage patterns
-- Automatic model training every 24 hours
-- Requires 1000+ samples for initial training
+**Purpose:** Local machine learning for predictions and anomaly detection
+
+**What It Does:**
+- Learns patterns from Sentinel's collected data
+- Predicts future resource usage (5, 15, 30, 60 minutes ahead)
+- Detects anomalies and unusual behavior
+- Clusters usage patterns (gaming, work, idle, etc.)
+- Trains models automatically every 24 hours
+
+**ML Models:**
+- **LSTM Forecaster:** Time-series prediction for CPU, RAM, GPU
+- **Isolation Forest:** Anomaly detection (unusual system behavior)
+- **K-Means Clustering:** Groups similar usage patterns
+- **Classifier:** Identifies activity types
+
+**Requirements:**
+- Minimum 1000 samples (~12 hours of Sentinel data)
+- TensorFlow 2.20.0
+- Currently has ~23 samples (needs 977 more)
+
+**Modules:**
+- `models/` - ML model implementations
+- `training/` - Data loading and feature engineering
+- `inference/` - Predictions and pattern matching
+- `patterns/` - Pattern storage and behavior profiles
+
+**See:** `oracle/README.md` for detailed ML documentation
+
+---
 
 ### Sage - AI Assistant
-Gemini 2.5 Flash integration:
-- Natural language system queries
-- Proactive insights and recommendations
-- Conversation history tracking
-- Context-aware responses
+**Purpose:** Natural language interface powered by Google Gemini 2.5 Flash
+
+**What It Does:**
+- Answers questions about your system in natural language
+- Provides insights and recommendations
+- Tracks conversation history
+- Aggregates context from Sentinel and Oracle
+- Generates proactive insights
+
+**Features:**
+- **Context-Aware:** Sees current metrics, learned patterns, and history
+- **Conversational:** Maintains session context across messages
+- **Proactive:** Monitors for issues and suggests optimizations
+- **Learning:** Collects feedback to improve responses
+
+**Modules:**
+- `gemini_client/` - Gemini API integration with rate limiting
+- `conversation/` - Session management and intent classification
+- `prompts/` - System prompts and dynamic prompt building
+- `context/` - Context aggregation from all sources
+- `insights/` - Proactive monitoring and insight generation
+- `feedback/` - User feedback collection and preference learning
+
+**Example Questions:**
+- "What's my current CPU usage?"
+- "Show me RAM trends over the last hour"
+- "Are there any anomalies?"
+- "What patterns have you learned?"
+- "Optimize my system for gaming"
+
+**See:** `sage/README.md` for detailed AI documentation
+
+---
 
 ### Guardian - Auto-Tuning
-System optimization profiles:
-- Gaming profile (max performance)
-- Work profile (balanced)
-- Power saver profile (efficiency)
-- Automatic profile switching
+**Purpose:** Automated system optimization with safety mechanisms
+
+**What It Does:**
+- Applies optimization profiles (Gaming, Work, Power Saver)
+- Manages processes and resource allocation
+- Tunes CPU, GPU, and RAM settings
+- Creates snapshots before changes
+- Automatic rollback on failure
+
+**Profiles:**
+- **Gaming:** Max performance, close background apps, prioritize game
+- **Work:** Balanced mode, keep productivity apps
+- **Power Saver:** Minimize power consumption, reduce performance
+
+**Actions:**
+- **Process:** Kill, set priority, set CPU affinity, limit memory
+- **Resource:** Clear cache, defragment memory, adjust page file
+- **System:** Set power plan, adjust frequencies, configure QoS
+
+**Safety:**
+- **Snapshots:** Capture system state before changes
+- **Validation:** Check if actions are safe
+- **Rollback:** Restore previous state on failure
+
+**Modules:**
+- `profiles/` - Profile definitions and management
+- `actions/` - System action implementations
+- `execution/` - Safe action execution with logging
+- `safety/` - Snapshots, rollback, validation
+- `integration/` - Connect to Sentinel, Oracle, Sage
+
+**See:** `guardian/README.md` for detailed optimization documentation
+
+---
 
 ### Nexus - Dashboard
-Web interface on port 8001:
-- Real-time metrics display
-- Chat with Sage AI
-- System status monitoring
-- API documentation
+**Purpose:** Web interface and API gateway
+
+**What It Does:**
+- Provides web dashboard on http://localhost:8001
+- Exposes REST API for all components
+- Real-time chat interface with Sage
+- Displays live system metrics
+- Shows learned patterns and predictions
+
+**Features:**
+- **Dashboard:** Beautiful HTML interface with real-time updates
+- **Chat:** Talk to Sage AI directly from browser
+- **Metrics:** Live CPU, RAM, GPU, Disk, Network graphs
+- **Patterns:** View learned patterns and anomalies
+- **Control:** Apply Guardian profiles from UI
+- **API Docs:** Swagger documentation at /docs
+
+**API Endpoints:**
+- `/api/chat/*` - Chat with Sage
+- `/api/metrics/*` - System metrics (current, history, processes, summary)
+- `/api/patterns/*` - Learned patterns, anomalies, predictions
+- `/api/control/*` - Guardian profile management
+- `/health` - Service health check
+
+**Modules:**
+- `api/` - FastAPI endpoint implementations
+- `templates/` - HTML dashboard
+- `static/` - CSS, JavaScript, images
+- `websockets/` - Real-time streaming (currently disabled)
+
+**See:** `nexus/README.md` for detailed API documentation
 
 ## 🛠️ Management Commands
 
@@ -111,16 +239,62 @@ Receive-Job -Id <job_id> -Keep
 
 ```
 phase2/
-├── sentinel/          # Data collection
-├── oracle/            # ML pattern learning
+├── sentinel/          # Data collection (11 collectors, SQLite storage)
+│   ├── collectors/    # CPU, RAM, GPU, Disk, Network, Process, etc.
+│   ├── aggregator/    # Data pipeline and normalization
+│   ├── storage/       # Database layer and query builder
+│   ├── patterns/      # Pattern detection (baseline, spikes, thresholds)
+│   └── cli/           # Command-line interface
+│
+├── oracle/            # ML pattern learning (TensorFlow)
+│   ├── models/        # LSTM, Isolation Forest, K-Means, Classifier
+│   ├── training/      # Data loading and feature engineering
+│   ├── inference/     # Predictions and pattern matching
+│   ├── patterns/      # Pattern storage and behavior profiles
+│   └── integration/   # Sentinel connector and scheduler
+│
 ├── sage/              # Gemini AI integration
-├── guardian/          # Auto-tuning
-├── nexus/             # Web dashboard
-├── setup-all.ps1      # Installation script
-├── start-all.ps1      # Start script
-├── stop-all.ps1       # Stop script
-└── status-all.ps1     # Status check
+│   ├── gemini_client/ # Gemini 2.5 Flash API client
+│   ├── conversation/  # Session management and intent classification
+│   ├── prompts/       # System prompts and prompt building
+│   ├── context/       # Context aggregation from all sources
+│   ├── insights/      # Proactive monitoring
+│   └── feedback/      # User feedback and preference learning
+│
+├── guardian/          # Auto-tuning and optimization
+│   ├── profiles/      # Gaming, Work, Power Saver profiles
+│   ├── actions/       # Process, Resource, System actions
+│   ├── execution/     # Safe action execution
+│   ├── safety/        # Snapshots, rollback, validation
+│   └── integration/   # Connect to other components
+│
+├── nexus/             # Web dashboard and API gateway
+│   ├── api/           # REST API endpoints (chat, metrics, patterns, control)
+│   ├── templates/     # HTML dashboard
+│   ├── static/        # CSS, JavaScript
+│   └── websockets/    # Real-time streaming (disabled)
+│
+├── setup-all.ps1      # Installation script (Python 3.12 + uv)
+├── start-all.ps1      # Start all components in background
+├── stop-all.ps1       # Stop all components
+├── status-all.ps1     # Check component status
+│
+└── Documentation/
+    ├── README.md                  # This file
+    ├── SETUP.md                   # Setup instructions
+    ├── USAGE.md                   # Usage guide
+    ├── SCRIPTS.md                 # Script reference
+    ├── QUICKSTART.md              # Quick start guide
+    ├── WHAT_IT_LEARNS.md          # Privacy and data collection
+    ├── IMPROVEMENTS_NEEDED.md     # Known issues and improvements
+    ├── TEMPERATURE_SETUP.md       # Temperature monitoring setup
+    ├── COLLECTOR_REFERENCE.md     # Detailed collector docs
+    ├── MODULE_ARCHITECTURE.md     # System architecture
+    ├── architecture.md            # Technical architecture
+    └── data-sources.md            # Data source documentation
 ```
+
+**See `MODULE_ARCHITECTURE.md` for detailed component architecture and data flow.**
 
 ## 🔧 Configuration
 
@@ -205,11 +379,29 @@ MIT License - See LICENSE file for details
 
 ## 📚 Documentation
 
-- [Setup Guide](SETUP.md)
-- [Usage Guide](USAGE.md)
-- [Architecture](architecture.md)
-- [Data Sources](data-sources.md)
-- [Scripts Reference](SCRIPTS.md)
+### Getting Started
+- [Quick Start Guide](QUICKSTART.md) - Get up and running in 5 minutes
+- [Setup Guide](SETUP.md) - Detailed installation instructions
+- [Usage Guide](USAGE.md) - How to use each component
+
+### Architecture & Design
+- [Module Architecture](MODULE_ARCHITECTURE.md) - Complete system architecture
+- [Technical Architecture](architecture.md) - Technical design details
+- [Data Sources](data-sources.md) - Data collection sources
+
+### Component Documentation
+- [Collector Reference](COLLECTOR_REFERENCE.md) - All 11 collectors explained
+- [Temperature Setup](TEMPERATURE_SETUP.md) - Enable temperature monitoring
+- [Sentinel README](sentinel/README.md) - Data collection details
+- [Oracle README](oracle/README.md) - ML model details
+- [Sage README](sage/README.md) - AI assistant details
+- [Guardian README](guardian/README.md) - Auto-tuning details
+- [Nexus README](nexus/README.md) - Dashboard and API details
+
+### Reference
+- [Scripts Reference](SCRIPTS.md) - PowerShell script documentation
+- [What It Learns](WHAT_IT_LEARNS.md) - Privacy and data collection
+- [Improvements Needed](IMPROVEMENTS_NEEDED.md) - Known issues and roadmap
 
 ---
 

@@ -43,6 +43,28 @@ class SystemConfig(BaseModel):
     max_ram_mb: int = Field(default=500, description="Maximum RAM usage in MB")
 
 
+class AIDA64Config(BaseModel):
+    """AIDA64 integration configuration"""
+    enabled: bool = Field(default=False, description="Enable AIDA64 collector")
+    shared_memory: bool = Field(default=True, description="Use shared memory (faster)")
+    report_path: Optional[Path] = Field(default=None, description="Path to XML report file")
+    
+    @property
+    def is_configured(self) -> bool:
+        """Check if AIDA64 is properly configured"""
+        return self.enabled and (self.shared_memory or self.report_path is not None)
+
+
+class HWiNFOConfig(BaseModel):
+    """HWiNFO64 integration configuration (Free alternative to AIDA64)"""
+    enabled: bool = Field(default=False, description="Enable HWiNFO64 collector")
+    
+    @property
+    def is_configured(self) -> bool:
+        """Check if HWiNFO is properly configured"""
+        return self.enabled
+
+
 class GeminiConfig(BaseModel):
     """Gemini API configuration"""
     api_key: Optional[str] = Field(default=None)
@@ -60,11 +82,17 @@ class Config(BaseModel):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     system: SystemConfig = Field(default_factory=SystemConfig)
+    aida64: AIDA64Config = Field(default_factory=AIDA64Config)
+    hwinfo: HWiNFOConfig = Field(default_factory=HWiNFOConfig)
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
     
     @classmethod
     def load(cls) -> "Config":
         """Load configuration from environment variables"""
+        # Parse AIDA64 report path
+        aida64_report = os.getenv("AIDA64_REPORT_PATH")
+        aida64_report_path = Path(aida64_report) if aida64_report else None
+        
         return cls(
             intervals=CollectionIntervals(
                 high_frequency=int(os.getenv("COLLECTION_INTERVAL_HIGH", "1")),
@@ -84,6 +112,14 @@ class Config(BaseModel):
                 log_level=os.getenv("LOG_LEVEL", "INFO"),
                 max_cpu_overhead=float(os.getenv("MAX_CPU_OVERHEAD", "2.0")),
                 max_ram_mb=int(os.getenv("MAX_RAM_MB", "500"))
+            ),
+            aida64=AIDA64Config(
+                enabled=os.getenv("ENABLE_AIDA64", "false").lower() == "true",
+                shared_memory=os.getenv("AIDA64_SHARED_MEMORY", "true").lower() == "true",
+                report_path=aida64_report_path
+            ),
+            hwinfo=HWiNFOConfig(
+                enabled=os.getenv("ENABLE_HWINFO", "false").lower() == "true"
             ),
             gemini=GeminiConfig(
                 api_key=os.getenv("GEMINI_API_KEY"),

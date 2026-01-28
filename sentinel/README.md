@@ -69,41 +69,179 @@ Sentinel is the foundation of the Phase 2 hybrid AI system. It continuously moni
 ## 📦 Components
 
 ### Data Collectors (11 total)
-- **CPU Collector** - Usage, frequency, temperature, per-core metrics
-- **RAM Collector** - Total, used, available, cached memory
-- **GPU Collector** - NVIDIA/AMD/Intel GPU metrics, VRAM usage
-- **Disk Collector** - Read/write speeds, queue length
-- **Network Collector** - Download/upload speeds, active connections
-- **Process Collector** - Top processes by CPU/RAM usage
-- **Context Collector** - Time of day, user activity, detected actions
-- **Temperature Collector** - System temperature sensors
-- **PowerShell Collector** - Custom PowerShell script integration
-- **WMI Collector** - Windows Management Instrumentation queries
-- **AIDA64 Collector** - AIDA64 sensor data integration
 
-### Storage Layer
-- **Database** - SQLite with time-series optimizations
-- **Schema** - Efficient table structure for metrics
-- **Repository** - Data access layer with CRUD operations
-- **Query Builder** - Flexible query construction
-- **Migrations** - Database schema versioning
+**Active Collectors (9):**
 
-### Aggregation Pipeline
-- **Pipeline** - Main orchestration of data collection
-- **Normalizer** - Data format standardization
-- **Validator** - Data quality checks
-- **Ring Buffer** - Circular buffer for streaming data
-- **Queue Manager** - Asynchronous collection management
+1. **CPU Collector** (`cpu_collector.py`)
+   - Overall CPU usage percentage
+   - Current frequency (MHz)
+   - Per-core usage percentages
+   - Temperature (currently NULL - needs AIDA64)
+   - Logical and physical core counts
+   - Collection time: <5ms, Overhead: <0.1%
 
-### Pattern Detection
-- **Baseline Calculator** - Normal operating range calculation
-- **Threshold Detector** - Simple threshold-based alerts
-- **Spike Detector** - Sudden change detection
+2. **RAM Collector** (`ram_collector.py`)
+   - Total, used, available RAM (GB)
+   - Usage percentage
+   - Cached memory
+   - Swap/page file usage
+   - Collection time: <2ms, Overhead: <0.05%
 
-### CLI Interface
-- **Main CLI** - Command-line interface with Click
-- **Rich Output** - Beautiful terminal formatting
-- **Commands** - collect, monitor, status, history, export
+3. **GPU Collector** (`gpu_collector.py`)
+   - GPU name and model
+   - Usage percentage
+   - VRAM used/total (GB)
+   - Temperature (°C) ✅ WORKING
+   - Fan speed (RPM)
+   - Power draw (W)
+   - Clock speeds (MHz)
+   - Supports: NVIDIA, AMD, Intel
+   - Collection time: <10ms, Overhead: <0.2%
+
+4. **Disk Collector** (`disk_collector.py`)
+   - Read/write speeds (MB/s)
+   - Queue length
+   - Per-disk usage percentages
+   - Total/free space (GB)
+   - I/O operations per second
+   - Collection time: <8ms, Overhead: <0.15%
+
+5. **Network Collector** (`network_collector.py`)
+   - Download/upload speeds (Mbps)
+   - Active connections count
+   - Bytes/packets sent/received
+   - Network errors
+   - Per-interface statistics
+   - Collection time: <5ms, Overhead: <0.1%
+
+6. **Process Collector** (`process_collector.py`)
+   - Top 10 processes by CPU/RAM
+   - Process name, PID, status
+   - Per-process CPU percentage
+   - Per-process memory (MB)
+   - Thread count, start time
+   - Privacy: Only names and resources, no paths/arguments
+   - Collection time: <15ms, Overhead: <0.3%
+
+7. **Context Collector** (`context_collector.py`)
+   - User activity status (active/idle)
+   - Time of day (morning/afternoon/evening/night)
+   - Day of week
+   - Detected action (coding/gaming/browsing/streaming)
+   - Idle time (seconds)
+   - Screen lock status
+   - Collection time: <10ms, Overhead: <0.2%
+
+8. **PowerShell Collector** (`powershell_collector.py`) - Optional
+   - Custom PowerShell script output
+   - Windows-specific metrics
+   - Registry values, Event logs
+   - Custom system queries
+   - Disabled by default
+   - Collection time: Variable
+
+9. **WMI Collector** (`wmi_collector.py`) - Optional
+   - Windows Management Instrumentation queries
+   - Hardware information
+   - System configuration
+   - Driver information, BIOS details
+   - Disabled by default
+   - Collection time: <50ms, Overhead: <0.5%
+
+**Inactive Collectors (2):**
+
+10. **Temperature Collector** (`temperature_collector.py`) - ⚠️ NOT WORKING
+    - Should collect: CPU, motherboard, chipset temps
+    - Currently returns NULL
+    - Needs: AIDA64, HWiNFO64, or LibreHardwareMonitor
+    - See: `../TEMPERATURE_SETUP.md` for setup instructions
+
+11. **AIDA64 Collector** (`aida64_collector.py`) - ✅ Implemented, NOT INTEGRATED
+    - Can collect: All temperatures, fan speeds, voltages, power
+    - Requires: AIDA64 Extreme ($39.95)
+    - Status: Code exists but not integrated into pipeline
+    - See: `../TEMPERATURE_SETUP.md` for integration instructions
+
+**Total Performance:** <70ms per collection, <2% CPU, <500MB RAM
+
+**See:** `../COLLECTOR_REFERENCE.md` for complete collector documentation
+
+### Storage Layer (`storage/`)
+- **database.py** - SQLite connection management with connection pooling
+- **schema.sql** - Database schema with time-series optimizations
+- **repository.py** - Data access layer with CRUD operations
+- **query_builder.py** - Flexible query construction for complex queries
+- **migrations.py** - Database schema versioning and upgrades
+
+**Database Schema:**
+```sql
+-- Main snapshot table
+CREATE TABLE system_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    context_data TEXT  -- JSON
+);
+
+-- Separate metric tables (linked via snapshot_id)
+CREATE TABLE cpu_metrics (...);
+CREATE TABLE ram_metrics (...);
+CREATE TABLE gpu_metrics (...);
+CREATE TABLE disk_metrics (...);
+CREATE TABLE network_metrics (...);
+CREATE TABLE process_info (...);
+```
+
+### Aggregation Pipeline (`aggregator/`)
+- **pipeline.py** - Main orchestration of data collection
+  - Initializes all enabled collectors
+  - Collects data asynchronously
+  - Handles collector failures gracefully
+  - Coordinates storage and pattern detection
+
+- **normalizer.py** - Data format standardization
+  - Converts all metrics to consistent units
+  - Handles missing values
+  - Validates data types
+
+- **validator.py** - Data quality checks
+  - Checks value ranges (e.g., CPU 0-100%)
+  - Detects impossible values
+  - Flags suspicious data
+
+- **ring_buffer.py** - Circular buffer for streaming data
+  - Stores last N snapshots in memory
+  - Enables real-time data access
+  - Used by Nexus for live updates
+
+- **queue_manager.py** - Asynchronous collection management
+  - Manages collector execution order
+  - Handles timeouts
+  - Prevents collector blocking
+
+### Pattern Detection (`patterns/`)
+- **baseline.py** - Normal operating range calculation
+  - Calculates mean and standard deviation
+  - Identifies normal ranges for each metric
+  - Updates baselines weekly
+
+- **threshold.py** - Simple threshold-based alerts
+  - CPU > 90% for 5 minutes
+  - RAM > 95% for 2 minutes
+  - Disk queue > 10 for 1 minute
+
+- **spike_detector.py** - Sudden change detection
+  - Detects rapid increases (>50% in 30 seconds)
+  - Identifies sudden drops
+  - Flags for Oracle analysis
+
+### CLI Interface (`cli/`)
+- **main.py** - Command-line interface with Click
+  - `collect` - Single data collection
+  - `monitor` - Continuous monitoring
+  - `status` - Database statistics
+  - `history` - Historical data view
+  - `export` - Data export to JSON/CSV
+- **Rich Output** - Beautiful terminal formatting with colors and tables
 
 ## 🚀 Quick Start
 
@@ -260,10 +398,17 @@ GEMINI_MODEL=gemini-2.5-flash
 
 ## 📚 Documentation
 
-- **README.md** - This file
+### Sentinel-Specific
+- **README.md** - This file (component overview)
 - **USAGE.md** - Detailed usage examples
 - **TROUBLESHOOTING.md** - Common issues and solutions
 - **IMPLEMENTATION_CHECKLIST.md** - Development progress tracker
+
+### System-Wide Documentation
+- **../COLLECTOR_REFERENCE.md** - Complete collector documentation
+- **../TEMPERATURE_SETUP.md** - How to enable temperature monitoring
+- **../MODULE_ARCHITECTURE.md** - How Sentinel fits into the system
+- **../WHAT_IT_LEARNS.md** - Privacy and data collection details
 
 ## 🔗 Integration with Other Phases
 

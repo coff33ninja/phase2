@@ -14,6 +14,7 @@ from .temperature_collector import TemperatureCollector
 from .powershell_collector import PowerShellCollector
 from .wmi_collector import WMICollector
 from .aida64_collector import AIDA64Collector
+from .hwinfo_collector import HWiNFOCollector
 
 __all__ = [
     "BaseCollector",
@@ -28,4 +29,5 @@ __all__ = [
     "PowerShellCollector",
     "WMICollector",
     "AIDA64Collector",
+    "HWiNFOCollector",
 ]
