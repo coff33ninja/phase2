@@ -25,21 +25,21 @@ if (-not (Test-Path $PidFile)) {
 }
 
 # Read PID
-$Pid = Get-Content $PidFile
+$ProcessId = Get-Content $PidFile
 
 # Check if process exists
-$Process = Get-Process -Id $Pid -ErrorAction SilentlyContinue
+$Process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
 
 if (-not $Process) {
-    Write-Host "Sentinel process not found (PID: $Pid)" -ForegroundColor Yellow
+    Write-Host "Sentinel process not found (PID: $ProcessId)" -ForegroundColor Yellow
     Remove-Item -Path $PidFile
     exit 0
 }
 
 # Stop process
 try {
-    Stop-Process -Id $Pid -Force
-    Write-Host "Sentinel stopped (PID: $Pid)" -ForegroundColor Green
+    Stop-Process -Id $ProcessId -Force
+    Write-Host "Sentinel stopped (PID: $ProcessId)" -ForegroundColor Green
 }
 catch {
     Write-Host "Error stopping process: $_" -ForegroundColor Red

@@ -26,6 +26,24 @@ function Write-Info {
 
 Write-Header "Stopping Phase 2 Components"
 
+# Stop Sentinel service first (uses PID file)
+Write-Info "Stopping Sentinel service..."
+Push-Location sentinel
+try {
+    if (Test-Path "sentinel.pid") {
+        & .\stop-service.ps1 | Out-Null
+        Write-Success "Sentinel service stopped"
+    } else {
+        Write-Info "Sentinel service not running (no PID file)"
+    }
+}
+catch {
+    Write-Info "Error stopping Sentinel service: $_"
+}
+finally {
+    Pop-Location
+}
+
 # Stop background jobs
 Write-Info "Stopping background jobs..."
 $jobs = Get-Job

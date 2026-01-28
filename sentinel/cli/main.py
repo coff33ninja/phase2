@@ -61,10 +61,15 @@ async def _monitor(interval: int, duration: int = None):
                 # Collect and store
                 snapshot_id = await pipeline.collect_and_store()
                 count += 1
+                logger.info(f"Collected snapshot {snapshot_id} (iteration {count})")
                 
-                # Display current metrics
-                snapshot = await pipeline.collect_once()
-                _display_snapshot(snapshot, count)
+                # Display current metrics (only if console is available)
+                try:
+                    snapshot = await pipeline.collect_once()
+                    _display_snapshot(snapshot, count)
+                except Exception as display_error:
+                    # Console display failed (likely running in background), just log
+                    logger.debug(f"Console display skipped: {display_error}")
                 
                 await asyncio.sleep(interval)
                 

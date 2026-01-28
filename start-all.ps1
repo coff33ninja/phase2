@@ -90,15 +90,26 @@ if (-not $NexusOnly) {
     Write-Info "Starting Sentinel (Data Collection)..."
     
     if ($Background) {
-        $jobs += Start-ComponentBackground -Name "Sentinel" -Path "sentinel" -Command "python main.py collect"
+        # Use the new service script with auto-restart
+        Push-Location sentinel
+        try {
+            & .\start-service.ps1 -Interval 5 | Out-Null
+            Write-Success "Sentinel service started with auto-restart"
+        }
+        catch {
+            Write-Host "  Error starting Sentinel: $_" -ForegroundColor Red
+        }
+        finally {
+            Pop-Location
+        }
     } else {
-        Write-Host "  Run in separate terminal: cd sentinel && python main.py collect" -ForegroundColor White
+        Write-Host "  Run in separate terminal: cd sentinel && .\start-service.ps1" -ForegroundColor White
     }
     
     if ($SentinelOnly) {
         Write-Success "Sentinel started!"
         Write-Host ""
-        Write-Host "To stop: Get-Job | Stop-Job" -ForegroundColor Cyan
+        Write-Host "To stop: cd sentinel && .\stop-service.ps1" -ForegroundColor Cyan
         exit 0
     }
     
@@ -187,7 +198,7 @@ if ($Background) {
     Write-Host ""
     Write-Host "Terminal 1 - Sentinel:" -ForegroundColor Yellow
     Write-Host "  cd sentinel" -ForegroundColor White
-    Write-Host "  .\.venv\Scripts\python.exe main.py collect" -ForegroundColor White
+    Write-Host "  .\start-service.ps1" -ForegroundColor White
     Write-Host ""
     Write-Host "Terminal 2 - Nexus:" -ForegroundColor Yellow
     Write-Host "  cd nexus" -ForegroundColor White

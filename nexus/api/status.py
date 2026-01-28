@@ -48,7 +48,7 @@ async def get_system_status() -> Dict:
             "data_collection_hours": 0,
             "snapshot_count": 0,
             "min_hours_needed": 1.0,
-            "min_samples_needed": 100,
+            "min_samples_needed": 1000,  # Oracle's actual requirement
             "recommended_hours": 24.0,
             "progress_percentage": 0
         }
@@ -114,7 +114,7 @@ async def get_training_status() -> Dict:
         "snapshot_count": 0,
         "requirements": {
             "min_hours": 1.0,
-            "min_samples": 100,
+            "min_samples": 1000,  # Oracle's actual requirement
             "recommended_hours": 24.0
         },
         "progress": {
