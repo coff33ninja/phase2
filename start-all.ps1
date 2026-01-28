@@ -24,7 +24,7 @@ function Test-ComponentSetup {
     # Quick check if dependencies are installed by checking for click
     Push-Location $ComponentPath
     try {
-        $result = uv pip show click 2>&1
+        $null = uv pip show click 2>&1
         Pop-Location
         return $LASTEXITCODE -eq 0
     }
@@ -131,18 +131,30 @@ if (-not $Background -and -not $SentinelOnly -and -not $NexusOnly) {
     Write-Host ""
 }
 
-$jobs = @()
+
 
 # Start Sentinel
 if (-not $NexusOnly) {
     Write-Info "Starting Sentinel (Data Collection)..."
     
     if ($Background) {
-        # Use the new service script with auto-restart
+        # Start Sentinel service in background using Start-Process
         Push-Location sentinel
         try {
-            & .\start-service.ps1 -Interval 5 | Out-Null
-            Write-Success "Sentinel service started with auto-restart"
+            $null = Start-Process -FilePath "powershell.exe" `
+                -ArgumentList "-File", "start-service.ps1", "-Interval", "5" `
+                -WindowStyle Hidden `
+                -PassThru
+            
+            # Wait a moment for PID file to be created
+            Start-Sleep -Seconds 2
+            
+            if (Test-Path "sentinel.pid") {
+                $sentinelPid = Get-Content "sentinel.pid"
+                Write-Success "Sentinel service started (PID: $sentinelPid)"
+            } else {
+                Write-Success "Sentinel service starting..."
+            }
         }
         catch {
             Write-Host "  Error starting Sentinel: $_" -ForegroundColor Red
@@ -183,24 +195,23 @@ if (-not $SentinelOnly -and -not $NexusOnly) {
     
     if ($Background) {
         # Oracle runs scheduler for continuous learning
-        # Set TensorFlow environment variables to suppress warnings
-        $jobs += Start-Job -ScriptBlock {
-            param($p)
-            Set-Location $p
+        Push-Location oracle
+        try {
+            $oracleProcess = Start-Process -FilePath ".\.venv\Scripts\python.exe" `
+                -ArgumentList "main.py", "scheduler" `
+                -WindowStyle Hidden `
+                -PassThru `
+                -RedirectStandardError "logs\oracle_error.log" `
+                -RedirectStandardOutput "logs\oracle_output.log"
             
-            # Set TensorFlow environment variables
-            $env:TF_ENABLE_ONEDNN_OPTS = "0"
-            $env:TF_CPP_MIN_LOG_LEVEL = "2"
-            
-            # Activate venv and run command
-            if (Test-Path ".venv\Scripts\python.exe") {
-                & .\.venv\Scripts\python.exe main.py scheduler
-            } else {
-                Write-Error "Virtual environment not found in $p"
-            }
-        } -ArgumentList "oracle"
-        
-        Write-Success "Oracle started (Job ID: $($jobs[-1].Id))"
+            Write-Success "Oracle started (PID: $($oracleProcess.Id))"
+        }
+        catch {
+            Write-Host "  Error starting Oracle: $_" -ForegroundColor Red
+        }
+        finally {
+            Pop-Location
+        }
     } else {
         Write-Host "  Run in separate terminal: cd oracle && .\.venv\Scripts\python.exe main.py scheduler" -ForegroundColor White
     }
@@ -214,9 +225,24 @@ if (-not $SentinelOnly) {
     Write-Info "Starting Nexus (Dashboard)..."
     
     if ($Background) {
-        $jobs += Start-ComponentBackground -Name "Nexus" -Path "nexus" -Command "python -m uvicorn main:app --host 0.0.0.0 --port 8001 --no-access-log --ws none"
+        # Start Nexus using Start-Process with hidden window
+        Push-Location nexus
+        try {
+            $nexusProcess = Start-Process -FilePath ".\.venv\Scripts\python.exe" `
+                -ArgumentList "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "info" `
+                -WindowStyle Hidden `
+                -PassThru
+            
+            Write-Success "Nexus started (PID: $($nexusProcess.Id))"
+        }
+        catch {
+            Write-Host "  Error starting Nexus: $_" -ForegroundColor Red
+        }
+        finally {
+            Pop-Location
+        }
     } else {
-        Write-Host "  Run in separate terminal: cd nexus && .\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001 --ws none" -ForegroundColor White
+        Write-Host "  Run in separate terminal: cd nexus && .\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001" -ForegroundColor White
     }
     
     # Wait for Nexus to start
@@ -226,8 +252,19 @@ if (-not $SentinelOnly) {
 Write-Header "Components Started!"
 
 if ($Background) {
-    Write-Host "Running Jobs:" -ForegroundColor Cyan
-    Get-Job | Format-Table -AutoSize
+    Write-Host "Running Processes:" -ForegroundColor Cyan
+    
+    # Show Sentinel
+    if (Test-Path "sentinel\sentinel.pid") {
+        $sentinelPid = Get-Content "sentinel\sentinel.pid"
+        Write-Host "  Sentinel (PID: $sentinelPid)" -ForegroundColor Green
+    }
+    
+    # Show Python processes
+    $pythonProcs = Get-Process python -ErrorAction SilentlyContinue
+    if ($pythonProcs) {
+        Write-Host "  Python processes: $($pythonProcs.Count)" -ForegroundColor Green
+    }
     
     Write-Host ""
     Write-Host "Access Points:" -ForegroundColor Yellow
@@ -237,10 +274,9 @@ if ($Background) {
     
     Write-Host ""
     Write-Host "Management Commands:" -ForegroundColor Yellow
-    Write-Host "  View jobs:   Get-Job" -ForegroundColor White
-    Write-Host "  View output: Receive-Job -Id <id>" -ForegroundColor White
-    Write-Host "  Stop all:    Get-Job | Stop-Job" -ForegroundColor White
-    Write-Host "  Remove all:  Get-Job | Remove-Job" -ForegroundColor White
+    Write-Host "  Status:      .\status-all.ps1" -ForegroundColor White
+    Write-Host "  Stop all:    .\stop-all.ps1" -ForegroundColor White
+    Write-Host "  View logs:   Get-Content <component>\logs\*.log -Tail 50 -Wait" -ForegroundColor White
 } else {
     Write-Host "Manual Start Instructions:" -ForegroundColor Cyan
     Write-Host ""
