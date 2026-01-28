@@ -47,15 +47,9 @@ if (Test-Path ".venv") {
 }
 Write-Host ""
 
-# Activate virtual environment
-Write-Host "Activating virtual environment..." -ForegroundColor Yellow
-& .\.venv\Scripts\Activate.ps1
-Write-Host "✓ Virtual environment activated" -ForegroundColor Green
-Write-Host ""
-
 # Install dependencies
 Write-Host "Installing dependencies..." -ForegroundColor Yellow
-uv pip install -r requirements.txt
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✓ Dependencies installed" -ForegroundColor Green
@@ -67,7 +61,7 @@ Write-Host ""
 
 # Install in editable mode
 Write-Host "Installing Nexus in editable mode..." -ForegroundColor Yellow
-uv pip install -e .
+uv pip install --python .venv\Scripts\python.exe -e .
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✓ Nexus installed" -ForegroundColor Green

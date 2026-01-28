@@ -89,10 +89,10 @@ if (Test-Path $activateScript) {
 # Install dependencies
 Write-Host "`n[5/6] Installing dependencies..." -ForegroundColor Yellow
 if ($uvInstalled) {
-    uv pip install -r requirements.txt
+    uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 } else {
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
+    .\.venv\Scripts\python.exe -m pip install --upgrade pip
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 }
 Write-Host "  ✓ Dependencies installed" -ForegroundColor Green
 

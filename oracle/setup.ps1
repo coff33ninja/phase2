@@ -51,12 +51,23 @@ if (!(Test-Path ".env")) {
     Write-Host ".env already exists" -ForegroundColor Yellow
 }
 
+# Create virtual environment if not exists
+if (!(Test-Path ".venv")) {
+    Write-Host "Creating virtual environment..." -ForegroundColor Yellow
+    if ($useUv) {
+        uv venv --python 3.12
+    } else {
+        python -m venv .venv
+    }
+    Write-Host "Virtual environment created" -ForegroundColor Green
+}
+
 # Install dependencies
 Write-Host "[5/6] Installing dependencies..." -ForegroundColor Yellow
 if ($useUv) {
-    uv pip install -r requirements.txt
+    uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 } else {
-    pip install -r requirements.txt
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 }
 
 if ($LASTEXITCODE -ne 0) {
@@ -66,7 +77,11 @@ if ($LASTEXITCODE -ne 0) {
 
 # Install package in editable mode
 Write-Host "[6/6] Installing Oracle package..." -ForegroundColor Yellow
-pip install -e .
+if ($useUv) {
+    uv pip install --python .venv\Scripts\python.exe -e .
+} else {
+    .\.venv\Scripts\python.exe -m pip install -e .
+}
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

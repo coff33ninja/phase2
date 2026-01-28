@@ -16,9 +16,16 @@ if ($pythonVersion -match "Python 3\.12") {
     Write-Host "Warning: Python 3.12 recommended, found: $pythonVersion" -ForegroundColor Yellow
 }
 
+# Create virtual environment if not exists
+if (!(Test-Path ".venv")) {
+    Write-Host "`nCreating virtual environment..." -ForegroundColor Cyan
+    uv venv --python 3.12
+    Write-Host "Virtual environment created" -ForegroundColor Green
+}
+
 # Install dependencies
 Write-Host "`nInstalling dependencies..." -ForegroundColor Cyan
-uv pip install -r requirements.txt
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Dependencies installed successfully!" -ForegroundColor Green
@@ -41,7 +48,7 @@ New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 
 # Install package in editable mode
 Write-Host "`nInstalling Sage package..." -ForegroundColor Cyan
-pip install -e .
+uv pip install --python .venv\Scripts\python.exe -e .
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nSetup complete!" -ForegroundColor Green
