@@ -229,7 +229,7 @@ if (-not $SentinelOnly) {
         Push-Location nexus
         try {
             $nexusProcess = Start-Process -FilePath ".\.venv\Scripts\python.exe" `
-                -ArgumentList "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "info" `
+                -ArgumentList "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--ws", "wsproto", "--log-level", "info" `
                 -WindowStyle Hidden `
                 -PassThru
             
@@ -242,7 +242,7 @@ if (-not $SentinelOnly) {
             Pop-Location
         }
     } else {
-        Write-Host "  Run in separate terminal: cd nexus && .\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001" -ForegroundColor White
+        Write-Host "  Run in separate terminal: cd nexus && .\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001 --ws wsproto" -ForegroundColor White
     }
     
     # Wait for Nexus to start
