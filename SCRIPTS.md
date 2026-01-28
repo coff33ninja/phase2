@@ -105,6 +105,69 @@ Complete guide to Phase 2 management scripts for easy setup, start, stop, and st
 
 ---
 
+### 5. uninstall-all.ps1
+**Purpose:** Completely uninstall Phase 2 components
+
+**Usage:**
+```powershell
+# Complete uninstall (removes everything)
+.\uninstall-all.ps1
+
+# Uninstall but keep data
+.\uninstall-all.ps1 -KeepData
+
+# Uninstall but keep virtual environments
+.\uninstall-all.ps1 -KeepVenvs
+
+# Uninstall without confirmation
+.\uninstall-all.ps1 -Force
+
+# Keep both data and venvs
+.\uninstall-all.ps1 -KeepData -KeepVenvs
+```
+
+**What it removes:**
+- ✓ Virtual environments (.venv folders)
+- ✓ Collected data (databases)
+- ✓ Logs
+- ✓ Configuration files (.env)
+- ✓ Python cache (__pycache__)
+- ✓ Pytest cache
+- ✓ Egg-info directories
+- ✓ Backup files
+
+**What it keeps:**
+- ✓ Source code (Python files)
+- ✓ Documentation (*.md files)
+- ✓ Scripts (*.ps1 files)
+- ✓ Requirements files
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `-KeepData` | Switch | Keep databases and collected data |
+| `-KeepVenvs` | Switch | Keep virtual environments |
+| `-Force` | Switch | Skip confirmation prompt |
+
+**Examples:**
+```powershell
+# Full uninstall with confirmation
+.\uninstall-all.ps1
+
+# Quick uninstall (no prompt)
+.\uninstall-all.ps1 -Force
+
+# Uninstall but preserve data for later
+.\uninstall-all.ps1 -KeepData
+
+# Clean install (remove venvs but keep data)
+.\uninstall-all.ps1 -KeepData
+.\setup-all.ps1 -QuickSetup
+```
+
+---
+
 ## Quick Start Workflow
 
 ### First Time Setup
@@ -478,6 +541,11 @@ python main.py --port $config.nexus.port
 
 # Status
 .\status-all.ps1                   # Check status
+
+# Uninstall
+.\uninstall-all.ps1                # Full uninstall
+.\uninstall-all.ps1 -KeepData      # Keep databases
+.\uninstall-all.ps1 -Force         # No confirmation
 
 # Jobs
 Get-Job                            # List jobs

@@ -219,6 +219,9 @@ http://localhost:8001
 ## 🛠️ Management Commands
 
 ```powershell
+# Setup (first time)
+.\setup-all.ps1 -QuickSetup
+
 # Start all components
 .\start-all.ps1 -All
 
@@ -227,6 +230,15 @@ http://localhost:8001
 
 # Check status
 .\status-all.ps1
+
+# Uninstall (removes venvs, data, logs, config)
+.\uninstall-all.ps1
+
+# Uninstall but keep data
+.\uninstall-all.ps1 -KeepData
+
+# Uninstall but keep virtual environments
+.\uninstall-all.ps1 -KeepVenvs
 
 # View running jobs
 Get-Job
