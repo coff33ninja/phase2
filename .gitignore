@@ -85,3 +85,4 @@ dmypy.json
 
 # IDE STUFF
 .kiro/
+sentinel/sentinel.pid
