@@ -100,9 +100,9 @@ function Install-Component {
             }
         }
         
-        # Install dependencies using the venv's Python
+        # Install dependencies using uv
         Write-Info "Installing dependencies..."
-        uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+        uv pip install -r requirements.txt
         
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to install dependencies"
@@ -110,7 +110,7 @@ function Install-Component {
         
         # Install in editable mode
         Write-Info "Installing $Name in editable mode..."
-        uv pip install --python .venv\Scripts\python.exe -e .
+        uv pip install -e .
         
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to install $Name"

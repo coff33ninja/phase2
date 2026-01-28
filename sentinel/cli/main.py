@@ -142,12 +142,13 @@ async def _collect():
 
 
 @cli.command()
-def status():
+@click.option('--full', is_flag=True, help='Show full system status including all components')
+def status(full):
     """Show database status and statistics"""
-    asyncio.run(_status())
+    asyncio.run(_status(full))
 
 
-async def _status():
+async def _status(full: bool = False):
     """Show status"""
     config = Config.load()
     pipeline = Pipeline(config)
@@ -155,21 +156,155 @@ async def _status():
     try:
         await pipeline.initialize()
         
+        # Database statistics
         stats = await pipeline.get_statistics()
         
-        table = Table(title="Database Statistics")
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green")
+        db_table = Table(title="Sentinel Database Statistics", show_header=True)
+        db_table.add_column("Metric", style="cyan", width=25)
+        db_table.add_column("Value", style="green")
         
-        table.add_row("Total Snapshots", str(stats['total_snapshots']))
-        table.add_row("Database Size", f"{stats['database_size_mb']} MB")
-        table.add_row("Oldest Snapshot", str(stats['oldest_snapshot'] or 'N/A'))
-        table.add_row("Newest Snapshot", str(stats['newest_snapshot'] or 'N/A'))
+        db_table.add_row("Total Snapshots", str(stats['total_snapshots']))
+        db_table.add_row("Database Size", f"{stats['database_size_mb']:.2f} MB")
+        db_table.add_row("Oldest Snapshot", str(stats['oldest_snapshot'] or 'N/A'))
+        db_table.add_row("Newest Snapshot", str(stats['newest_snapshot'] or 'N/A'))
         
-        console.print(table)
+        # Calculate collection rate
+        if stats['total_snapshots'] > 0 and stats['oldest_snapshot'] and stats['newest_snapshot']:
+            from datetime import datetime
+            oldest = datetime.fromisoformat(stats['oldest_snapshot'])
+            newest = datetime.fromisoformat(stats['newest_snapshot'])
+            duration = (newest - oldest).total_seconds()
+            if duration > 0:
+                rate = stats['total_snapshots'] / (duration / 60)  # per minute
+                db_table.add_row("Collection Rate", f"{rate:.2f} samples/min")
+        
+        console.print(db_table)
+        console.print()
+        
+        # Current system metrics
+        try:
+            snapshot = await pipeline.collect_once()
+            
+            sys_table = Table(title="Current System Metrics", show_header=True)
+            sys_table.add_column("Component", style="cyan", width=20)
+            sys_table.add_column("Metric", style="yellow", width=25)
+            sys_table.add_column("Value", style="green")
+            
+            # CPU
+            sys_table.add_row("CPU", "Usage", f"{snapshot.cpu.usage_percent:.1f}%")
+            sys_table.add_row("", "Frequency", f"{snapshot.cpu.frequency_mhz:.0f} MHz" if snapshot.cpu.frequency_mhz else "N/A")
+            if snapshot.cpu.temperature_celsius:
+                sys_table.add_row("", "Temperature", f"{snapshot.cpu.temperature_celsius:.1f}°C")
+            
+            # RAM
+            sys_table.add_row("RAM", "Usage", f"{snapshot.ram.usage_percent:.1f}%")
+            sys_table.add_row("", "Used", f"{snapshot.ram.used_gb:.2f} GB")
+            sys_table.add_row("", "Available", f"{snapshot.ram.available_gb:.2f} GB")
+            
+            # Disk
+            sys_table.add_row("Disk", "Read Speed", f"{snapshot.disk.read_mbps:.2f} MB/s")
+            sys_table.add_row("", "Write Speed", f"{snapshot.disk.write_mbps:.2f} MB/s")
+            if snapshot.disk.usage_percent:
+                sys_table.add_row("", "Usage", f"{snapshot.disk.usage_percent:.1f}%")
+            
+            # Network
+            sys_table.add_row("Network", "Download", f"{snapshot.network.download_mbps:.2f} MB/s")
+            sys_table.add_row("", "Upload", f"{snapshot.network.upload_mbps:.2f} MB/s")
+            
+            # GPU
+            if snapshot.gpu:
+                for idx, gpu in enumerate(snapshot.gpu):
+                    sys_table.add_row(f"GPU {idx}", "Usage", f"{gpu.usage_percent:.1f}%")
+                    sys_table.add_row("", "Memory", f"{gpu.memory_used_gb:.2f} / {gpu.memory_total_gb:.2f} GB")
+                    if gpu.temperature_celsius:
+                        sys_table.add_row("", "Temperature", f"{gpu.temperature_celsius:.1f}°C")
+            
+            console.print(sys_table)
+            console.print()
+            
+        except Exception as e:
+            console.print(f"[yellow]Could not collect current metrics: {e}[/yellow]\n")
+        
+        # Full status includes other components
+        if full:
+            await _show_component_status()
     
     finally:
         await pipeline.shutdown()
+
+
+async def _show_component_status():
+    """Show status of all Phase 2 components"""
+    import subprocess
+    from pathlib import Path
+    
+    components_table = Table(title="Phase 2 Components Status", show_header=True)
+    components_table.add_column("Component", style="cyan", width=15)
+    components_table.add_column("Status", style="yellow", width=15)
+    components_table.add_column("Database", style="green", width=20)
+    components_table.add_column("Details", style="dim")
+    
+    base_path = Path(__file__).parent.parent.parent
+    components = ['sentinel', 'oracle', 'sage', 'guardian', 'nexus']
+    
+    for component in components:
+        comp_path = base_path / component
+        
+        # Check installation
+        venv_path = comp_path / ".venv" / "Scripts" / "python.exe"
+        installed = venv_path.exists()
+        
+        # Check database
+        db_path = comp_path / "data"
+        db_files = list(db_path.glob("*.db")) if db_path.exists() else []
+        
+        # Check if running (basic check for python processes)
+        running = False
+        try:
+            result = subprocess.run(
+                ['powershell', '-Command', f'Get-Process python -ErrorAction SilentlyContinue | Where-Object {{$_.Path -like "*{component}*"}}'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            running = bool(result.stdout.strip())
+        except:
+            pass
+        
+        # Status
+        if not installed:
+            status = "❌ Not Installed"
+            db_status = "N/A"
+            details = "Run setup.ps1"
+        elif running:
+            status = "✅ Running"
+            db_status = f"{len(db_files)} file(s)" if db_files else "No data"
+            details = "Active"
+        else:
+            status = "⚠️ Stopped"
+            db_status = f"{len(db_files)} file(s)" if db_files else "No data"
+            details = "Installed but not running"
+        
+        components_table.add_row(component.capitalize(), status, db_status, details)
+    
+    console.print(components_table)
+    console.print()
+    
+    # Show running Python processes
+    try:
+        result = subprocess.run(
+            ['powershell', '-Command', 'Get-Process python -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count'],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        count = result.stdout.strip()
+        if count and count != '0':
+            console.print(f"[green]Python Processes Running: {count}[/green]")
+        else:
+            console.print("[yellow]No Python processes detected[/yellow]")
+    except:
+        pass
 
 
 @cli.command()

@@ -12,6 +12,28 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Test-ComponentSetup {
+    param([string]$ComponentPath)
+    
+    $venvPath = Join-Path $ComponentPath ".venv\Scripts\python.exe"
+    
+    if (-not (Test-Path $venvPath)) {
+        return $false
+    }
+    
+    # Quick check if dependencies are installed by checking for click
+    Push-Location $ComponentPath
+    try {
+        $result = uv pip show click 2>&1
+        Pop-Location
+        return $LASTEXITCODE -eq 0
+    }
+    catch {
+        Pop-Location
+        return $false
+    }
+}
+
 function Write-Header {
     param([string]$Text)
     Write-Host ""
@@ -64,6 +86,32 @@ if (-not (Test-Path "sentinel")) {
     Write-Host "✗ Please run this script from the root directory with component folders" -ForegroundColor Red
     exit 1
 }
+
+# Validate component setup
+Write-Info "Validating component setup..."
+$componentsToCheck = @("sentinel", "nexus")
+if (-not $SentinelOnly -and -not $NexusOnly) {
+    $componentsToCheck += @("oracle", "sage", "guardian")
+}
+
+$setupIssues = @()
+foreach ($comp in $componentsToCheck) {
+    if (-not (Test-ComponentSetup -ComponentPath $comp)) {
+        $setupIssues += $comp
+    }
+}
+
+if ($setupIssues.Count -gt 0) {
+    Write-Host ""
+    Write-Host "✗ Setup incomplete for: $($setupIssues -join ', ')" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Please run setup first:" -ForegroundColor Yellow
+    Write-Host "  .\setup-all.ps1 -QuickSetup" -ForegroundColor White
+    Write-Host ""
+    exit 1
+}
+
+Write-Success "All components validated"
 
 # If -All flag is used, set -Background automatically
 if ($All) {

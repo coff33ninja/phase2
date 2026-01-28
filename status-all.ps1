@@ -1,96 +1,57 @@
-# Phase 2 Status Check Script
-# Checks status of all Phase 2 components
+# Phase 2 Comprehensive Status Check Script
+# Shows status of all Phase 2 components via Sentinel's comprehensive status
 # Author: coff33ninja
 # Date: January 28, 2026
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
-function Write-Header {
-    param([string]$Text)
+# Check if Sentinel is installed
+if (-not (Test-Path "sentinel\.venv\Scripts\python.exe")) {
     Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host $Text -ForegroundColor Cyan
-    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "❌ Sentinel not installed" -ForegroundColor Red
+    Write-Host "   Sentinel is required for system status checks" -ForegroundColor Yellow
     Write-Host ""
+    Write-Host "   Run: .\setup-all.ps1 -QuickSetup" -ForegroundColor Cyan
+    Write-Host ""
+    exit 1
 }
 
-function Test-ComponentStatus {
-    param(
-        [string]$Name,
-        [string]$Path
-    )
+# Run Sentinel's comprehensive status (includes all components)
+Push-Location sentinel
+try {
+    & ".\.venv\Scripts\python.exe" -m cli.main status --full
     
-    Write-Host "$Name" -ForegroundColor Yellow -NoNewline
-    Write-Host " ($Path)" -ForegroundColor DarkGray
-    
-    # Check if directory exists
-    if (-not (Test-Path $Path)) {
-        Write-Host "  ✗ Directory not found" -ForegroundColor Red
-        return
-    }
-    
-    # Check if installed (check for venv)
-    Push-Location $Path
-    $venvExists = Test-Path ".venv"
-    $installed = $venvExists -and (Test-Path ".venv\Scripts\python.exe")
+    # Quick Actions Footer
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "  Quick Actions" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  Start all:     " -NoNewline -ForegroundColor White
+    Write-Host ".\start-all.ps1 -All" -ForegroundColor Green
+    Write-Host "  Stop all:      " -NoNewline -ForegroundColor White
+    Write-Host ".\stop-all.ps1" -ForegroundColor Green
+    Write-Host "  Dashboard:     " -NoNewline -ForegroundColor White
+    Write-Host "http://localhost:8001" -ForegroundColor Green
+    Write-Host "  Ask Sage:      " -NoNewline -ForegroundColor White
+    Write-Host "cd sage && .\.venv\Scripts\python.exe -m cli.main query" -ForegroundColor Green
+    Write-Host "  Train Oracle:  " -NoNewline -ForegroundColor White
+    Write-Host "cd oracle && .\.venv\Scripts\python.exe -m cli.main train" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Component-specific status:" -ForegroundColor DarkGray
+    Write-Host "    Sentinel:  cd sentinel && .\.venv\Scripts\python.exe -m cli.main status" -ForegroundColor DarkGray
+    Write-Host "    Oracle:    cd oracle && .\.venv\Scripts\python.exe -m cli.main status" -ForegroundColor DarkGray
+    Write-Host "    Sage:      cd sage && .\.venv\Scripts\python.exe -m cli.main status" -ForegroundColor DarkGray
+    Write-Host "    Guardian:  cd guardian && .\.venv\Scripts\python.exe -m cli.main status" -ForegroundColor DarkGray
+    Write-Host "    Nexus:     cd nexus && .\.venv\Scripts\python.exe -m cli.main status" -ForegroundColor DarkGray
+    Write-Host ""
+}
+catch {
+    Write-Host ""
+    Write-Host "❌ Error running status check: $_" -ForegroundColor Red
+    Write-Host ""
+    exit 1
+}
+finally {
     Pop-Location
-    
-    if ($installed) {
-        Write-Host "  ✓ Installed (venv ready)" -ForegroundColor Green
-    } elseif ($venvExists) {
-        Write-Host "  ⚠ Venv exists but incomplete" -ForegroundColor Yellow
-    } else {
-        Write-Host "  ✗ Not installed" -ForegroundColor Red
-    }
-    
-    # Check database
-    $dbPath = Join-Path $Path "data"
-    if (Test-Path $dbPath) {
-        $dbFiles = Get-ChildItem -Path $dbPath -Filter "*.db" -ErrorAction SilentlyContinue
-        if ($dbFiles) {
-            Write-Host "  ✓ Database: $($dbFiles.Count) file(s)" -ForegroundColor Green
-        } else {
-            Write-Host "  ○ Database: No data yet" -ForegroundColor Gray
-        }
-    }
-    
-    # Check logs
-    $logPath = Join-Path $Path "logs"
-    if (Test-Path $logPath) {
-        $logFiles = Get-ChildItem -Path $logPath -Filter "*.log" -ErrorAction SilentlyContinue
-        if ($logFiles) {
-            Write-Host "  ✓ Logs: $($logFiles.Count) file(s)" -ForegroundColor Green
-        }
-    }
-    
-    Write-Host ""
 }
-
-Write-Header "Phase 2 Component Status"
-
-# Check components
-Test-ComponentStatus -Name "Sentinel" -Path "sentinel"
-Test-ComponentStatus -Name "Oracle" -Path "oracle"
-Test-ComponentStatus -Name "Sage" -Path "sage"
-Test-ComponentStatus -Name "Guardian" -Path "guardian"
-Test-ComponentStatus -Name "Nexus" -Path "nexus"
-
-# Check running processes
-Write-Host "Running Processes:" -ForegroundColor Cyan
-$pythonProcs = Get-Process python -ErrorAction SilentlyContinue
-if ($pythonProcs) {
-    Write-Host "  Python: $($pythonProcs.Count) process(es)" -ForegroundColor Green
-} else {
-    Write-Host "  Python: None running" -ForegroundColor Gray
-}
-
-# Check background jobs
-$jobs = Get-Job -ErrorAction SilentlyContinue
-if ($jobs) {
-    Write-Host "  Background Jobs: $($jobs.Count)" -ForegroundColor Green
-    $jobs | Format-Table -AutoSize
-} else {
-    Write-Host "  Background Jobs: None" -ForegroundColor Gray
-}
-
-Write-Host ""
