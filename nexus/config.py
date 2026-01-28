@@ -16,7 +16,7 @@ class NexusConfig(BaseSettings):
     
     # Server Settings
     host: str = Field(default="0.0.0.0", description="Server host")
-    port: int = Field(default=8000, description="Server port")
+    port: int = Field(default=8001, description="Server port")
     reload: bool = Field(default=True, description="Auto-reload on code changes")
     
     # Integration Paths
@@ -47,7 +47,7 @@ class NexusConfig(BaseSettings):
         description="Secret key for JWT"
     )
     cors_origins: str = Field(
-        default="http://localhost:3000,http://localhost:8000",
+        default="http://localhost:3000,http://localhost:8001",
         description="Comma-separated CORS origins"
     )
     

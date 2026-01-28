@@ -191,7 +191,7 @@ if ($Background) {
     Write-Host ""
     Write-Host "Terminal 2 - Nexus:" -ForegroundColor Yellow
     Write-Host "  cd nexus" -ForegroundColor White
-    Write-Host "  .\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000 --ws none" -ForegroundColor White
+    Write-Host "  .\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001 --ws none" -ForegroundColor White
     Write-Host ""
     Write-Host "Optional - Oracle (Terminal 3):" -ForegroundColor Yellow
     Write-Host "  cd oracle" -ForegroundColor White
