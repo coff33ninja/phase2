@@ -57,7 +57,8 @@ async def _handle_query(query: str, session_id: str = None):
             system_state=context.get("system_state"),
             patterns=context.get("patterns"),
             anomalies=context.get("anomalies"),
-            predictions=context.get("predictions")
+            predictions=context.get("predictions"),
+            training_status=context.get("training_status")
         )
         
         # Generate response
@@ -179,7 +180,7 @@ async def _show_status():
                     
                     # Training requirements
                     MIN_HOURS = 1.0  # Minimum 1 hour of data
-                    MIN_SAMPLES = 100  # Minimum 100 snapshots
+                    MIN_SAMPLES = 1000  # Minimum 1000 snapshots
                     RECOMMENDED_HOURS = 24.0  # Recommended 24 hours
                     
                     hours_progress = min(100, (duration_hours / MIN_HOURS) * 100)

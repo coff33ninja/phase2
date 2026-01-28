@@ -47,7 +47,7 @@ class ContextAggregator:
             "data_collection_hours": 0,
             "snapshot_count": 0,
             "min_hours_needed": 1.0,
-            "min_samples_needed": 100,
+            "min_samples_needed": 1000,
             "recommended_hours": 24.0
         }
         

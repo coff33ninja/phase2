@@ -12,7 +12,8 @@ class PromptBuilder:
         system_state: Optional[Dict] = None,
         patterns: Optional[Dict] = None,
         anomalies: Optional[list] = None,
-        predictions: Optional[Dict] = None
+        predictions: Optional[Dict] = None,
+        training_status: Optional[Dict] = None
     ) -> str:
         """Build analysis prompt with context.
         
@@ -22,11 +23,17 @@ class PromptBuilder:
             patterns: Learned patterns from Oracle
             anomalies: Recent anomalies
             predictions: Predictions from Oracle
+            training_status: Oracle training status and data collection info
             
         Returns:
             Complete prompt string
         """
         parts = [SYSTEM_PROMPT, "\n## Context\n"]
+        
+        # Always include training status first so AI knows what capabilities are available
+        if training_status:
+            parts.append("\n### Training Status")
+            parts.append(PromptBuilder._format_training_status(training_status))
         
         if system_state:
             parts.append("\n### Current System State")
@@ -76,6 +83,20 @@ class PromptBuilder:
             lines.append(f"- Work Hours: {patterns['work_hours']}")
         if "common_apps" in patterns:
             lines.append(f"- Common Apps: {', '.join(patterns['common_apps'])}")
+        return "\n".join(lines)
+    
+    @staticmethod
+    def _format_training_status(status: Dict) -> str:
+        """Format training status for prompt."""
+        lines = [
+            f"- Oracle Trained: {'Yes' if status.get('oracle_trained') else 'No'}",
+            f"- Sentinel Active: {'Yes' if status.get('sentinel_active') else 'No'}",
+            f"- Ready for Training: {'Yes' if status.get('ready_for_training') else 'No'}",
+            f"- Snapshots Collected: {status.get('snapshot_count', 0)}",
+            f"- Data Collection Hours: {status.get('data_collection_hours', 0)}",
+            f"- Minimum Required: {status.get('min_samples_needed', 1000)} samples / {status.get('min_hours_needed', 1.0)} hours",
+            f"- Recommended: {status.get('recommended_hours', 24.0)} hours for best results"
+        ]
         return "\n".join(lines)
     
     @staticmethod
