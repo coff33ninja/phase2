@@ -122,13 +122,39 @@ class ModelScheduler:
         self.is_running = True
         logger.info("Model scheduler started")
         
-        # Run initial update
-        self._update_models()
+        # Check if models exist, if not and we have enough data, train immediately
+        models_exist = self._check_models_exist()
+        if not models_exist:
+            logger.info("No trained models found, checking if we can train...")
+            loader = SentinelDataLoader(self.sentinel_db_path)
+            stats = loader.get_statistics()
+            
+            if stats['total_samples'] >= config.min_training_samples:
+                logger.info(f"Found {stats['total_samples']} samples, starting initial training...")
+                self._update_models()
+            else:
+                logger.info(f"Need {config.min_training_samples - stats['total_samples']} more samples before training")
+        else:
+            logger.info("Models already trained, running scheduled updates")
+            # Run update to refresh with latest data
+            self._update_models()
         
         # Start scheduled updates
         while self.is_running:
             schedule.run_pending()
             time.sleep(60)  # Check every minute
+    
+    def _check_models_exist(self) -> bool:
+        """Check if trained models exist.
+        
+        Returns:
+            True if models exist, False otherwise
+        """
+        lstm_model = self.model_dir / "lstm_forecaster.joblib"
+        anomaly_model = self.model_dir / "isolation_forest_detector.joblib"
+        clustering_model = self.model_dir / "kmeans_clustering.joblib"
+        
+        return lstm_model.exists() and anomaly_model.exists() and clustering_model.exists()
     
     def stop(self):
         """Stop the scheduler."""

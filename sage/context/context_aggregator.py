@@ -40,8 +40,18 @@ class ContextAggregator:
         Returns:
             Training status information
         """
+        # Check if models exist in saved_models directory
+        oracle_models_dir = Path("../oracle/saved_models")
+        models_exist = False
+        if oracle_models_dir.exists():
+            # Check for key model files
+            lstm_model = oracle_models_dir / "lstm_forecaster.joblib"
+            anomaly_model = oracle_models_dir / "isolation_forest_detector.joblib"
+            clustering_model = oracle_models_dir / "kmeans_clustering.joblib"
+            models_exist = lstm_model.exists() and anomaly_model.exists() and clustering_model.exists()
+        
         status = {
-            "oracle_trained": self.oracle_db.exists(),
+            "oracle_trained": models_exist or self.oracle_db.exists(),
             "sentinel_active": self.sentinel_db.exists(),
             "ready_for_training": False,
             "data_collection_hours": 0,

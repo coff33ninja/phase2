@@ -18,6 +18,18 @@ async def get_system_status() -> Dict:
     # Database paths
     sentinel_db = Path("../sentinel/data/system_stats.db")
     oracle_db = Path("../oracle/data/patterns.db")
+    oracle_models_dir = Path("../oracle/saved_models")
+    
+    # Check if Oracle is trained by looking for model files
+    oracle_trained = False
+    if oracle_models_dir.exists():
+        lstm_model = oracle_models_dir / "lstm_forecaster.joblib"
+        anomaly_model = oracle_models_dir / "isolation_forest_detector.joblib"
+        clustering_model = oracle_models_dir / "kmeans_clustering.joblib"
+        oracle_trained = lstm_model.exists() and anomaly_model.exists() and clustering_model.exists()
+    
+    if not oracle_trained and oracle_db.exists():
+        oracle_trained = True
     
     status = {
         "components": {
@@ -26,7 +38,7 @@ async def get_system_status() -> Dict:
                 "database": str(sentinel_db)
             },
             "oracle": {
-                "trained": oracle_db.exists(),
+                "trained": oracle_trained,
                 "database": str(oracle_db)
             },
             "sage": {
@@ -43,12 +55,12 @@ async def get_system_status() -> Dict:
             }
         },
         "training": {
-            "oracle_trained": oracle_db.exists(),
+            "oracle_trained": oracle_trained,
             "ready_for_training": False,
             "data_collection_hours": 0,
             "snapshot_count": 0,
             "min_hours_needed": 1.0,
-            "min_samples_needed": 1000,  # Oracle's actual requirement
+            "min_samples_needed": 1000,
             "recommended_hours": 24.0,
             "progress_percentage": 0
         }
@@ -105,16 +117,28 @@ async def get_training_status() -> Dict:
     """
     sentinel_db = Path("../sentinel/data/system_stats.db")
     oracle_db = Path("../oracle/data/patterns.db")
+    oracle_models_dir = Path("../oracle/saved_models")
+    
+    # Check if Oracle is trained by looking for model files
+    oracle_trained = False
+    if oracle_models_dir.exists():
+        lstm_model = oracle_models_dir / "lstm_forecaster.joblib"
+        anomaly_model = oracle_models_dir / "isolation_forest_detector.joblib"
+        clustering_model = oracle_models_dir / "kmeans_clustering.joblib"
+        oracle_trained = lstm_model.exists() and anomaly_model.exists() and clustering_model.exists()
+    
+    if not oracle_trained and oracle_db.exists():
+        oracle_trained = True
     
     training_status = {
-        "oracle_trained": oracle_db.exists(),
+        "oracle_trained": oracle_trained,
         "sentinel_active": sentinel_db.exists(),
         "ready_for_training": False,
         "data_collection_hours": 0,
         "snapshot_count": 0,
         "requirements": {
             "min_hours": 1.0,
-            "min_samples": 1000,  # Oracle's actual requirement
+            "min_samples": 1000,
             "recommended_hours": 24.0
         },
         "progress": {
@@ -160,17 +184,17 @@ async def get_training_status() -> Dict:
             training_status["progress"]["overall_percentage"] = round((time_progress + samples_progress) / 2, 1)
             
             # Determine readiness and next steps
-            if oracle_db.exists():
+            if oracle_trained:
                 training_status["next_steps"].append({
                     "action": "trained",
-                    "description": "Oracle is already trained and ready",
+                    "description": "Oracle is trained and ready! Automatic retraining every 24 hours.",
                     "status": "complete"
                 })
             elif duration_hours >= training_status["requirements"]["min_hours"] and snapshot_count >= training_status["requirements"]["min_samples"]:
                 training_status["ready_for_training"] = True
                 training_status["next_steps"].append({
                     "action": "train_oracle",
-                    "description": "Ready to train! Run Oracle training",
+                    "description": "Ready to train! Oracle will train automatically when scheduler runs.",
                     "command": "cd oracle && python main.py train",
                     "priority": "high"
                 })
