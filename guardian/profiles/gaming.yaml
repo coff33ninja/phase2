@@ -1,0 +1,22 @@
+actions:
+- description: Close Discord to free resources
+  target: Discord.exe
+  type: close_process
+- description: Close Spotify to free resources
+  target: Spotify.exe
+  type: close_process
+- description: Close Chrome to free RAM
+  target: chrome.exe
+  type: close_process
+- description: Switch to performance power plan
+  parameters:
+    mode: performance
+  type: power_plan
+- description: Clear RAM cache
+  type: clear_ram
+description: Optimize system for gaming performance
+enabled: true
+name: gaming
+rollback_on_exit: true
+schedule: null
+trigger: game_detected

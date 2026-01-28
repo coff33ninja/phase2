@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Dashboard - AI System Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .card h2 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        #chat-container {
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        
+        .message.user {
+            background: rgba(102, 126, 234, 0.6);
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .message.sage {
+            background: rgba(118, 75, 162, 0.6);
+        }
+        
+        .message-time {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        #chat-input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #chat-input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 1em;
+        }
+        
+        #chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 215, 0, 0.8);
+            color: #333;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: rgba(255, 215, 0, 1);
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .metric {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online {
+            background: #4ade80;
+            box-shadow: 0 0 10px #4ade80;
+        }
+        
+        .status-indicator.offline {
+            background: #ef4444;
+        }
+        
+        .api-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .api-link {
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        .api-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌐 Nexus Dashboard</h1>
+            <p class="subtitle">AI-Powered System Intelligence Hub</p>
+        </header>
+        
+        <div class="grid">
+            <!-- Chat Interface -->
+            <div class="card">
+                <h2>💬 Chat with Sage AI</h2>
+                <div id="chat-container">
+                    <div id="chat-messages"></div>
+                    <div id="chat-input-container">
+                        <input 
+                            type="text" 
+                            id="chat-input" 
+                            placeholder="Ask Sage about your system..."
+                            onkeypress="if(event.key==='Enter') sendMessage()"
+                        >
+                        <button onclick="sendMessage()" id="send-btn">Send</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Status -->
+            <div class="card">
+                <h2>📊 System Status</h2>
+                <div style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 10px;">
+                        <span class="status-indicator online"></span>
+                        <strong>Sentinel</strong> - Collecting Data
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <span class="status-indicator online"></span>
+                        <strong>Oracle</strong> - Learning Patterns
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <span class="status-indicator online"></span>
+                        <strong>Sage</strong> - AI Ready
+                    </div>
+                    <div>
+                        <span class="status-indicator offline"></span>
+                        <strong>Guardian</strong> - Standby
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Quick Links</h3>
+                <div class="api-links">
+                    <a href="/api/metrics/current" class="api-link" target="_blank">📈 Metrics</a>
+                    <a href="/api/patterns/learned" class="api-link" target="_blank">🧠 Patterns</a>
+                    <a href="/api/chat/history" class="api-link" target="_blank">💬 History</a>
+                    <a href="/docs" class="api-link" target="_blank">📚 API Docs</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Metrics -->
+        <div class="card">
+            <h2>📊 Live System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-metric">--</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">RAM Usage</div>
+                    <div class="metric-value" id="ram-metric">--</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">GPU Usage</div>
+                    <div class="metric-value" id="gpu-metric">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const time = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <div>${text}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+            
+            // Add user message
+            addMessage(message, 'user');
+            chatInput.value = '';
+            sendBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/chat/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message, context: {} })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addMessage(data.response, 'sage');
+                } else {
+                    addMessage(`Error: ${data.detail}`, 'sage');
+                }
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, 'sage');
+            } finally {
+                sendBtn.disabled = false;
+                chatInput.focus();
+            }
+        }
+        
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/api/metrics/current');
+                const data = await response.json();
+                
+                if (data.cpu) {
+                    document.getElementById('cpu-metric').textContent = 
+                        data.cpu.usage_percent.toFixed(1) + '%';
+                }
+                if (data.ram) {
+                    document.getElementById('ram-metric').textContent = 
+                        data.ram.usage_percent.toFixed(1) + '%';
+                }
+                if (data.gpu && data.gpu.length > 0) {
+                    document.getElementById('gpu-metric').textContent = 
+                        data.gpu[0].usage_percent.toFixed(1) + '%';
+                }
+            } catch (error) {
+                console.error('Failed to update metrics:', error);
+            }
+        }
+        
+        // Update metrics every 5 seconds
+        updateMetrics();
+        setInterval(updateMetrics, 5000);
+        
+        // Welcome message
+        addMessage('Hello! I\'m Sage, your AI system assistant powered by Gemini 2.5 Flash. Ask me anything about your system!', 'sage');
+    </script>
+</body>
+</html>

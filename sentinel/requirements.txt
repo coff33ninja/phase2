@@ -1,0 +1,40 @@
+# Phase 2.1 Foundation Requirements
+# Python 3.12+ required
+
+# Core Data Collection
+psutil>=5.9.8
+GPUtil>=1.4.0
+py-cpuinfo>=9.0.0
+wmi>=1.5.1; sys_platform == 'win32'
+
+# Time-Series Storage
+aiosqlite>=0.19.0
+
+# Async Processing
+aiofiles>=23.2.1
+
+# Data Validation & Serialization
+pydantic>=2.5.0
+
+# Logging
+loguru>=0.7.2
+
+# Configuration
+python-dotenv>=1.0.0
+
+# CLI Interface
+click>=8.1.0
+rich>=13.0.0
+
+# Testing (for future)
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+
+# Gemini Integration (Phase 2.3)
+google-generativeai>=0.3.0
+
+# ML Libraries (Phase 2.2) - Required for Oracle integration
+numpy>=1.26.0,<2.0.0
+scikit-learn>=1.3.2
+
+websockets

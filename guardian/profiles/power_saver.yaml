@@ -1,0 +1,21 @@
+actions:
+- description: Switch to power saver mode
+  parameters:
+    mode: power_saver
+  type: power_plan
+- description: Reduce brightness to 50%
+  parameters:
+    level: 50
+  type: display_brightness
+- description: Close Chrome to save power
+  target: chrome.exe
+  type: close_process
+- description: Close Discord to save power
+  target: Discord.exe
+  type: close_process
+description: Conserve battery power
+enabled: true
+name: power_saver
+rollback_on_exit: true
+schedule: null
+trigger: battery_low

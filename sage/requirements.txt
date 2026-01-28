@@ -1,0 +1,22 @@
+# Core AI
+google-genai>=1.0.0
+
+# Data & Configuration
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+aiosqlite>=0.19.0
+
+# Caching & Storage
+redis>=5.0.0
+
+# CLI & Logging
+click>=8.1.0
+rich>=13.0.0
+loguru>=0.7.2
+
+# Development
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+pytest-cov>=4.1.0
+ruff>=0.1.0

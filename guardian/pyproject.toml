@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guardian"
+version = "0.1.0"
+description = "Guardian - Auto-Tuning & Optimization Engine"
+authors = [
+    {name = "coff33ninja", email = "coff33ninja69@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+keywords = ["automation", "optimization", "system-management", "guardian"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "psutil>=5.9.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "loguru>=0.7.2",
+    "apscheduler>=3.10.0",
+    "pyyaml>=6.0.0",
+    "pywin32>=306; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+guardian = "cli.main:cli"
+
+[tool.setuptools]
+packages = ["actions", "profiles", "safety", "execution", "integration", "cli", "utils"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]

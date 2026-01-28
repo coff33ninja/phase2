@@ -1,0 +1,17 @@
+actions:
+- description: Close Steam during work hours
+  target: Steam.exe
+  type: close_process
+- description: Close Epic Games Launcher
+  target: EpicGamesLauncher.exe
+  type: close_process
+- description: Switch to balanced power plan
+  parameters:
+    mode: balanced
+  type: power_plan
+description: Optimize system for work productivity
+enabled: true
+name: work
+rollback_on_exit: false
+schedule: weekdays 9:00-17:00
+trigger: work_hours
