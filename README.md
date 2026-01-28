@@ -17,35 +17,68 @@ A hybrid AI system combining local ML (TensorFlow) with cloud AI (Google Gemini 
 - Windows 10/11
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/) package manager
-- Google Gemini API key
+- Google Gemini API key (for Sage)
 
 ### Installation
 
-1. Clone the repository:
+#### Option 1: Install All Components (Recommended)
 ```powershell
+# Clone the repository
 git clone https://github.com/coff33ninja/phase2.git
 cd phase2
-```
 
-2. Run the setup script:
-```powershell
+# Run automated setup for all components
 .\setup-all.ps1 -QuickSetup
 ```
 
-3. Configure your Gemini API key:
+#### Option 2: Install Individual Components
+Each component has its own `setup.ps1` script:
 ```powershell
-# Edit sage/.env and add your API key
+# Install Sentinel only
+cd sentinel
+.\setup.ps1
+
+# Install Oracle only
+cd oracle
+.\setup.ps1
+
+# Install Sage only
+cd sage
+.\setup.ps1
+
+# Install Guardian only
+cd guardian
+.\setup.ps1
+
+# Install Nexus only
+cd nexus
+.\setup.ps1
+```
+
+### Configuration
+
+Configure your Gemini API key:
+```powershell
+# Edit sage/.env and sentinel/.env
 GEMINI_API_KEY=your_api_key_here
 ```
 
-4. Start all components:
-```powershell
-.\start-all.ps1 -All
-```
+### Starting Components
 
-5. Access the dashboard:
-```
-http://localhost:8001
+```powershell
+# Start Sentinel (data collection)
+cd sentinel
+.\.venv\Scripts\python.exe main.py monitor
+
+# Start Nexus (dashboard) - in new terminal
+cd nexus
+.\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001 --ws none
+
+# Access the dashboard
+start http://localhost:8001
+
+# Check system status
+.\status.ps1
 ```
 
 ## 📊 Components
@@ -191,61 +224,100 @@ http://localhost:8001
 - Exposes REST API for all components
 - Real-time chat interface with Sage
 - Displays live system metrics
-- Shows learned patterns and predictions
+- Shows training status and progress
 
 **Features:**
-- **Dashboard:** Beautiful HTML interface with real-time updates
+- **Dashboard:** Real-time HTML interface with auto-updates
 - **Chat:** Talk to Sage AI directly from browser
-- **Metrics:** Live CPU, RAM, GPU, Disk, Network graphs
-- **Patterns:** View learned patterns and anomalies
-- **Control:** Apply Guardian profiles from UI
+- **Metrics:** Live CPU, RAM, GPU usage displays
+- **Training Status:** Progress bars showing data collection and readiness
+- **Component Health:** Real-time status indicators for all services
 - **API Docs:** Swagger documentation at /docs
 
 **API Endpoints:**
 - `/api/chat/*` - Chat with Sage
-- `/api/metrics/*` - System metrics (current, history, processes, summary)
-- `/api/patterns/*` - Learned patterns, anomalies, predictions
+- `/api/metrics/*` - System metrics (current, history)
+- `/api/patterns/*` - Learned patterns from Oracle
+- `/api/status/*` - System and training status
 - `/api/control/*` - Guardian profile management
 - `/health` - Service health check
 
-**Modules:**
-- `api/` - FastAPI endpoint implementations
-- `templates/` - HTML dashboard
-- `static/` - CSS, JavaScript, images
-- `websockets/` - Real-time streaming (currently disabled)
+**Current Status:**
+- ✅ Dashboard operational
+- ✅ Training status visibility
+- ✅ Real-time metrics display
+- ✅ Chat interface with Sage
+- ✅ Component health monitoring
 
-**See:** `nexus/README.md` for detailed API documentation
+**See:** [docs/nexus/](docs/nexus/) for detailed documentation
 
 ## 🛠️ Management Commands
 
+### Global Commands (All Components)
+
 ```powershell
-# Setup (first time)
+# Setup all components
 .\setup-all.ps1 -QuickSetup
 
-# Start all components
-.\start-all.ps1 -All
+# Check system status
+.\status.ps1
 
 # Stop all components
 .\stop-all.ps1
 
-# Check status
-.\status-all.ps1
-
-# Uninstall (removes venvs, data, logs, config)
+# Uninstall all (removes venvs, data, logs, config)
 .\uninstall-all.ps1
 
 # Uninstall but keep data
 .\uninstall-all.ps1 -KeepData
-
-# Uninstall but keep virtual environments
-.\uninstall-all.ps1 -KeepVenvs
-
-# View running jobs
-Get-Job
-
-# View component output
-Receive-Job -Id <job_id> -Keep
 ```
+
+### Component-Specific Commands
+
+Each component has its own setup, uninstall, and management scripts:
+
+```powershell
+# Sentinel
+cd sentinel
+.\setup.ps1                                    # Install
+.\uninstall.ps1                                # Uninstall
+.\uninstall.ps1 -KeepData                      # Uninstall but keep database
+.\.venv\Scripts\python.exe main.py status      # Check status
+.\.venv\Scripts\python.exe main.py monitor     # Start monitoring
+
+# Oracle
+cd oracle
+.\setup.ps1                                    # Install
+.\uninstall.ps1                                # Uninstall
+.\.venv\Scripts\python.exe main.py train       # Train models
+
+# Sage
+cd sage
+.\setup.ps1                                    # Install
+.\uninstall.ps1                                # Uninstall
+.\uninstall.ps1 -KeepConfig                    # Keep API key
+.\.venv\Scripts\python.exe main.py status      # Check status
+.\.venv\Scripts\python.exe main.py query "..."  # Ask question
+
+# Guardian
+cd guardian
+.\setup.ps1                                    # Install
+.\uninstall.ps1                                # Uninstall
+.\.venv\Scripts\python.exe main.py status      # Check status
+
+# Nexus
+cd nexus
+.\setup.ps1                                    # Install
+.\uninstall.ps1                                # Uninstall
+.\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8001 --ws none
+```
+
+### Uninstall Options
+
+All uninstall scripts support these flags:
+- `-KeepData` - Preserve database files
+- `-KeepVenv` - Preserve virtual environment
+- `-KeepConfig` - Preserve .env configuration
 
 ## 📁 Project Structure
 
@@ -321,14 +393,26 @@ Each component has its own `.env` file for configuration:
 ## 📈 Data Flow
 
 ```
-Sentinel → Collects Metrics → SQLite Database
+Sentinel → Collects Metrics → SQLite Database (every 5 seconds)
     ↓
-Oracle → Reads Data → Trains ML Models → Learns Patterns
+Oracle → Reads Data → Trains ML Models → Learns Patterns (needs 1h + 100 samples)
     ↓
-Sage → Queries Patterns → Generates Insights → Gemini 2.5 Flash
+Sage → Queries Data → Generates Insights → Gemini 2.5 Flash
     ↓
-Nexus → Displays Data → Chat Interface → User
+Nexus → Displays Data → Chat Interface → Training Status → User
 ```
+
+### Current System State
+
+**Operational:**
+- ✅ Sentinel: Collecting data every 5 seconds
+- ✅ Nexus: Dashboard running on port 8001
+- ✅ Sage: AI assistant ready (with API key)
+- ✅ Training Status: Visible in dashboard and CLI
+
+**In Progress:**
+- ⏳ Oracle: Collecting training data (needs 0.5h + 95 samples more)
+- ⏳ Guardian: Ready for use (on-demand)
 
 ## 🤖 Chat with Sage
 
@@ -394,30 +478,29 @@ MIT License - See LICENSE file for details
 ### Getting Started
 - [Quick Start Guide](QUICKSTART.md) - Get up and running in 5 minutes
 - [Setup Guide](SETUP.md) - Detailed installation instructions
-- [Usage Guide](USAGE.md) - How to use each component
-
-### Architecture & Design
 - [Module Architecture](MODULE_ARCHITECTURE.md) - Complete system architecture
-- [Technical Architecture](architecture.md) - Technical design details
-- [Data Sources](data-sources.md) - Data collection sources
 
 ### Component Documentation
-- [Collector Reference](COLLECTOR_REFERENCE.md) - All 11 collectors explained
-- [Temperature Setup](TEMPERATURE_SETUP.md) - Enable temperature monitoring
-- [Sentinel README](sentinel/README.md) - Data collection details
-- [Oracle README](oracle/README.md) - ML model details
-- [Sage README](sage/README.md) - AI assistant details
-- [Guardian README](guardian/README.md) - Auto-tuning details
-- [Nexus README](nexus/README.md) - Dashboard and API details
+- [Sentinel](docs/sentinel/) - Data collection and monitoring
+- [Oracle](docs/oracle/) - Machine learning and pattern recognition
+- [Sage](docs/sage/) - AI assistant powered by Gemini 2.5 Flash
+- [Guardian](docs/guardian/) - Auto-tuning and optimization
+- [Nexus](docs/nexus/) - Web dashboard and API gateway
 
-### Reference
-- [Scripts Reference](SCRIPTS.md) - PowerShell script documentation
-- [What It Learns](WHAT_IT_LEARNS.md) - Privacy and data collection
-- [Improvements Needed](IMPROVEMENTS_NEEDED.md) - Known issues and roadmap
+### Reference Documentation
+- [Collector Reference](docs/COLLECTOR_REFERENCE.md) - All 11 collectors explained
+- [Temperature Setup](docs/TEMPERATURE_SETUP.md) - Enable temperature monitoring
+- [Scripts Reference](docs/SCRIPTS.md) - PowerShell script documentation
+- [Training Readiness](docs/TRAINING_READINESS.md) - ML training requirements
+- [What It Learns](docs/WHAT_IT_LEARNS.md) - Privacy and data collection
+
+### Complete Documentation
+See [docs/](docs/) for the complete documentation index.
 
 ---
 
-**Status**: Active Development
-**Version**: 0.1.0
-**Python**: 3.12+
-**Platform**: Windows 10/11
+**Status**: Active Development  
+**Version**: 0.1.0  
+**Python**: 3.12+  
+**Platform**: Windows 10/11  
+**Last Updated**: January 28, 2026
