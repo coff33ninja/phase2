@@ -19,7 +19,7 @@ class NexusConfig(BaseSettings):
     port: int = Field(default=8001, description="Server port")
     reload: bool = Field(default=True, description="Auto-reload on code changes")
     
-    # Integration Paths
+    # Integration Paths (absolute paths from project root)
     sentinel_db_path: Path = Field(
         default=Path("../sentinel/data/system_stats.db"),
         description="Sentinel database path"
@@ -27,6 +27,10 @@ class NexusConfig(BaseSettings):
     oracle_db_path: Path = Field(
         default=Path("../oracle/data/patterns.db"),
         description="Oracle database path"
+    )
+    oracle_models_path: Path = Field(
+        default=Path("../oracle/saved_models"),
+        description="Oracle saved models directory"
     )
     sage_db_path: Path = Field(
         default=Path("../sage/data/conversations.db"),
@@ -71,6 +75,14 @@ class NexusConfig(BaseSettings):
         
         # Create necessary directories
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Resolve paths to absolute
+        nexus_dir = Path(__file__).parent
+        self.sentinel_db_path = (nexus_dir / self.sentinel_db_path).resolve()
+        self.oracle_db_path = (nexus_dir / self.oracle_db_path).resolve()
+        self.oracle_models_path = (nexus_dir / self.oracle_models_path).resolve()
+        self.sage_db_path = (nexus_dir / self.sage_db_path).resolve()
+        self.guardian_db_path = (nexus_dir / self.guardian_db_path).resolve()
     
     def get_cors_origins(self) -> List[str]:
         """Get CORS origins as a list.

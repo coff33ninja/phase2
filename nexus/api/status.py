@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 from datetime import datetime
 from typing import Dict
+from config import config
 
 router = APIRouter(prefix="/api/status", tags=["status"])
 
@@ -15,17 +16,19 @@ async def get_system_status() -> Dict:
     Returns:
         System status with component health and training progress
     """
-    # Database paths
-    sentinel_db = Path("../sentinel/data/system_stats.db")
-    oracle_db = Path("../oracle/data/patterns.db")
-    oracle_models_dir = Path("../oracle/saved_models")
+    # Use absolute paths from config
+    sentinel_db = config.sentinel_db_path
+    oracle_db = config.oracle_db_path
+    oracle_models_dir = config.oracle_models_path
     
     # Check if Oracle is trained by looking for model files
     oracle_trained = False
+    
     if oracle_models_dir.exists():
         lstm_model = oracle_models_dir / "lstm_forecaster.joblib"
         anomaly_model = oracle_models_dir / "isolation_forest_detector.joblib"
         clustering_model = oracle_models_dir / "kmeans_clustering.joblib"
+        
         oracle_trained = lstm_model.exists() and anomaly_model.exists() and clustering_model.exists()
     
     if not oracle_trained and oracle_db.exists():
@@ -115,9 +118,10 @@ async def get_training_status() -> Dict:
     Returns:
         Training readiness information
     """
-    sentinel_db = Path("../sentinel/data/system_stats.db")
-    oracle_db = Path("../oracle/data/patterns.db")
-    oracle_models_dir = Path("../oracle/saved_models")
+    # Use absolute paths from config
+    sentinel_db = config.sentinel_db_path
+    oracle_db = config.oracle_db_path
+    oracle_models_dir = config.oracle_models_path
     
     # Check if Oracle is trained by looking for model files
     oracle_trained = False
