@@ -25,25 +25,83 @@ async def get_current_metrics() -> Dict[str, Any]:
     """Get current system metrics.
     
     Returns:
-        Current metrics dictionary
+        Current metrics dictionary with CPU, RAM, GPU, Disk, Network
     """
     try:
         conn = get_sentinel_connection()
         cursor = conn.cursor()
         
+        # Get latest snapshot
         cursor.execute("""
-            SELECT * FROM system_metrics
+            SELECT id, timestamp FROM system_snapshots
             ORDER BY timestamp DESC
             LIMIT 1
         """)
         
-        row = cursor.fetchone()
+        snapshot = cursor.fetchone()
+        if not snapshot:
+            conn.close()
+            return {}
+        
+        snapshot_id = snapshot['id']
+        result = {
+            'timestamp': snapshot['timestamp'],
+            'snapshot_id': snapshot_id
+        }
+        
+        # Get CPU metrics
+        cursor.execute("""
+            SELECT usage_percent, frequency_mhz, temperature_celsius
+            FROM cpu_metrics
+            WHERE snapshot_id = ?
+        """, (snapshot_id,))
+        cpu = cursor.fetchone()
+        if cpu:
+            result['cpu'] = dict(cpu)
+        
+        # Get RAM metrics
+        cursor.execute("""
+            SELECT total_gb, used_gb, available_gb, cached_gb, usage_percent
+            FROM ram_metrics
+            WHERE snapshot_id = ?
+        """, (snapshot_id,))
+        ram = cursor.fetchone()
+        if ram:
+            result['ram'] = dict(ram)
+        
+        # Get GPU metrics
+        cursor.execute("""
+            SELECT name, usage_percent, memory_used_gb, memory_total_gb, 
+                   temperature_celsius, power_draw_watts
+            FROM gpu_metrics
+            WHERE snapshot_id = ?
+        """, (snapshot_id,))
+        gpus = cursor.fetchall()
+        if gpus:
+            result['gpu'] = [dict(gpu) for gpu in gpus]
+        
+        # Get Disk metrics
+        cursor.execute("""
+            SELECT read_mbps, write_mbps, queue_length, usage_percent
+            FROM disk_metrics
+            WHERE snapshot_id = ?
+        """, (snapshot_id,))
+        disk = cursor.fetchone()
+        if disk:
+            result['disk'] = dict(disk)
+        
+        # Get Network metrics
+        cursor.execute("""
+            SELECT download_mbps, upload_mbps, connections_active
+            FROM network_metrics
+            WHERE snapshot_id = ?
+        """, (snapshot_id,))
+        network = cursor.fetchone()
+        if network:
+            result['network'] = dict(network)
+        
         conn.close()
-        
-        if row:
-            return dict(row)
-        
-        return {}
+        return result
         
     except Exception as e:
         logger.error(f"Failed to get current metrics: {e}")
@@ -53,34 +111,42 @@ async def get_current_metrics() -> Dict[str, Any]:
 @router.get("/history")
 async def get_metrics_history(
     hours: int = Query(default=1, ge=1, le=168),
-    metric: Optional[str] = Query(default=None)
+    limit: int = Query(default=100, ge=1, le=1000)
 ) -> List[Dict[str, Any]]:
     """Get historical metrics.
     
     Args:
         hours: Number of hours to look back (1-168)
-        metric: Specific metric to retrieve (optional)
+        limit: Maximum number of data points to return
         
     Returns:
-        List of metric data points
+        List of metric data points with timestamp and all metrics
     """
     try:
         conn = get_sentinel_connection()
         cursor = conn.cursor()
         
-        if metric:
-            cursor.execute(f"""
-                SELECT timestamp, {metric} as value
-                FROM system_metrics
-                WHERE timestamp > datetime('now', ? || ' hours')
-                ORDER BY timestamp ASC
-            """, (f'-{hours}',))
-        else:
-            cursor.execute("""
-                SELECT * FROM system_metrics
-                WHERE timestamp > datetime('now', ? || ' hours')
-                ORDER BY timestamp ASC
-            """, (f'-{hours}',))
+        # Get snapshots with all metrics joined
+        cursor.execute("""
+            SELECT 
+                s.timestamp,
+                c.usage_percent as cpu_usage,
+                c.temperature_celsius as cpu_temp,
+                r.usage_percent as ram_usage,
+                r.used_gb as ram_used,
+                d.read_mbps as disk_read,
+                d.write_mbps as disk_write,
+                n.download_mbps as net_download,
+                n.upload_mbps as net_upload
+            FROM system_snapshots s
+            LEFT JOIN cpu_metrics c ON s.id = c.snapshot_id
+            LEFT JOIN ram_metrics r ON s.id = r.snapshot_id
+            LEFT JOIN disk_metrics d ON s.id = d.snapshot_id
+            LEFT JOIN network_metrics n ON s.id = n.snapshot_id
+            WHERE s.timestamp > datetime('now', '-' || ? || ' hours')
+            ORDER BY s.timestamp ASC
+            LIMIT ?
+        """, (hours, limit))
         
         data = [dict(row) for row in cursor.fetchall()]
         conn.close()
@@ -102,18 +168,32 @@ async def get_processes(
         limit: Maximum number of processes to return
         
     Returns:
-        List of process dictionaries
+        List of process dictionaries sorted by CPU usage
     """
     try:
         conn = get_sentinel_connection()
         cursor = conn.cursor()
         
+        # Get latest snapshot
         cursor.execute("""
-            SELECT * FROM processes
-            WHERE timestamp > datetime('now', '-5 minutes')
+            SELECT id FROM system_snapshots
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """)
+        
+        snapshot = cursor.fetchone()
+        if not snapshot:
+            conn.close()
+            return []
+        
+        # Get processes from latest snapshot
+        cursor.execute("""
+            SELECT name, pid, cpu_percent, memory_mb, threads, status
+            FROM process_info
+            WHERE snapshot_id = ?
             ORDER BY cpu_percent DESC
             LIMIT ?
-        """, (limit,))
+        """, (snapshot['id'], limit))
         
         processes = [dict(row) for row in cursor.fetchall()]
         conn.close()
@@ -126,8 +206,13 @@ async def get_processes(
 
 
 @router.get("/summary")
-async def get_metrics_summary() -> Dict[str, Any]:
+async def get_metrics_summary(
+    hours: int = Query(default=1, ge=1, le=24)
+) -> Dict[str, Any]:
     """Get metrics summary with averages and peaks.
+    
+    Args:
+        hours: Number of hours to summarize (1-24)
     
     Returns:
         Summary statistics dictionary
@@ -136,26 +221,46 @@ async def get_metrics_summary() -> Dict[str, Any]:
         conn = get_sentinel_connection()
         cursor = conn.cursor()
         
+        # Get CPU summary
         cursor.execute("""
             SELECT 
-                AVG(cpu_usage) as avg_cpu,
-                MAX(cpu_usage) as peak_cpu,
-                AVG(ram_usage) as avg_ram,
-                MAX(ram_usage) as peak_ram,
-                AVG(gpu_usage) as avg_gpu,
-                MAX(gpu_usage) as peak_gpu,
-                COUNT(*) as data_points
-            FROM system_metrics
-            WHERE timestamp > datetime('now', '-1 hour')
-        """)
+                AVG(c.usage_percent) as avg_cpu,
+                MAX(c.usage_percent) as peak_cpu,
+                AVG(c.temperature_celsius) as avg_cpu_temp
+            FROM system_snapshots s
+            JOIN cpu_metrics c ON s.id = c.snapshot_id
+            WHERE s.timestamp > datetime('now', '-' || ? || ' hours')
+        """, (hours,))
+        cpu_summary = dict(cursor.fetchone())
         
-        row = cursor.fetchone()
+        # Get RAM summary
+        cursor.execute("""
+            SELECT 
+                AVG(r.usage_percent) as avg_ram,
+                MAX(r.usage_percent) as peak_ram,
+                AVG(r.used_gb) as avg_ram_used
+            FROM system_snapshots s
+            JOIN ram_metrics r ON s.id = r.snapshot_id
+            WHERE s.timestamp > datetime('now', '-' || ? || ' hours')
+        """, (hours,))
+        ram_summary = dict(cursor.fetchone())
+        
+        # Get snapshot count
+        cursor.execute("""
+            SELECT COUNT(*) as data_points
+            FROM system_snapshots
+            WHERE timestamp > datetime('now', '-' || ? || ' hours')
+        """, (hours,))
+        count = cursor.fetchone()['data_points']
+        
         conn.close()
         
-        if row:
-            return dict(row)
-        
-        return {}
+        return {
+            **cpu_summary,
+            **ram_summary,
+            'data_points': count,
+            'hours': hours
+        }
         
     except Exception as e:
         logger.error(f"Failed to get metrics summary: {e}")
